@@ -21,10 +21,10 @@ export const mapStyle: MapStyle = {
       minzoom: 0,
       maxzoom: 20,
       paint: {
-        "raster-saturation": -0.15,
-        "raster-contrast": 0.2,
-        "raster-brightness-min": 0.08,
-        "raster-brightness-max": 0.85
+        "raster-saturation": -0.05,
+        "raster-contrast": 0.1,
+        "raster-brightness-min": 0.28,
+        "raster-brightness-max": 0.92
       }
     }
   ]

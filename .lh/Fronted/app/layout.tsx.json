@@ -1,0 +1,26 @@
+{
+    "sourceFile": "Fronted/app/layout.tsx",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 2,
+            "patches": [
+                {
+                    "date": 1776622057895,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776622742763,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -2,10 +2,10 @@\n import \"./globals.css\";\r\n import \"maplibre-gl/dist/maplibre-gl.css\";\r\n \r\n export const metadata: Metadata = {\r\n-  title: \"GPS Control EC — Seguimiento de flota en tiempo real\",\r\n-  description: \"Plataforma GPS para control de flotas en Ecuador. Ubicación en tiempo real, geocercas, alertas y panel operativo.\",\r\n+  title: \"GPS Control EC - Seguimiento de flota en tiempo real\",\r\n+  description: \"Plataforma GPS para control de flotas en Ecuador. Ubicacion en tiempo real, geocercas, alertas y panel operativo.\",\r\n };\r\n \r\n export default function RootLayout({ children }: { children: React.ReactNode }) {\r\n   return (\r\n"
+                },
+                {
+                    "date": 1776625658850,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -2,9 +2,9 @@\n import \"./globals.css\";\r\n import \"maplibre-gl/dist/maplibre-gl.css\";\r\n \r\n export const metadata: Metadata = {\r\n-  title: \"GPS Control EC - Seguimiento de flota en tiempo real\",\r\n+  title: \"GPS Control EC -- Seguimiento de flota en tiempo real\",\r\n   description: \"Plataforma GPS para control de flotas en Ecuador. Ubicacion en tiempo real, geocercas, alertas y panel operativo.\",\r\n };\r\n \r\n export default function RootLayout({ children }: { children: React.ReactNode }) {\r\n@@ -13,9 +13,9 @@\n       <head>\r\n         <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\" />\r\n         <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossOrigin=\"anonymous\" />\r\n         <link\r\n-          href=\"https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500;700&display=swap\"\r\n+          href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@500&display=swap\"\r\n           rel=\"stylesheet\"\r\n         />\r\n       </head>\r\n       <body>{children}</body>\r\n"
+                }
+            ],
+            "date": 1776622057895,
+            "name": "Commit-0",
+            "content": "import type { Metadata } from \"next\";\r\nimport \"./globals.css\";\r\nimport \"maplibre-gl/dist/maplibre-gl.css\";\r\n\r\nexport const metadata: Metadata = {\r\n  title: \"GPS Control EC — Seguimiento de flota en tiempo real\",\r\n  description: \"Plataforma GPS para control de flotas en Ecuador. Ubicación en tiempo real, geocercas, alertas y panel operativo.\",\r\n};\r\n\r\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\r\n  return (\r\n    <html lang=\"es\">\r\n      <head>\r\n        <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\" />\r\n        <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossOrigin=\"anonymous\" />\r\n        <link\r\n          href=\"https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500;700&display=swap\"\r\n          rel=\"stylesheet\"\r\n        />\r\n      </head>\r\n      <body>{children}</body>\r\n    </html>\r\n  );\r\n}"
+        }
+    ]
+}

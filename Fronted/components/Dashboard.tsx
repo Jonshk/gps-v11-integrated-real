@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
 import type { FleetPayload } from "@/lib/fleet";
 import FleetMap from "@/components/FleetMap";
 
@@ -7,8 +10,41 @@ type Props = {
   message?: string;
 };
 
-export default function Dashboard({ fleet, connected, message }: Props) {
+const POLL_MS = 20000;
+
+export default function Dashboard({ fleet: initialFleet, connected: initialConnected, message }: Props) {
+  const [fleet, setFleet]           = useState(initialFleet);
+  const [connected, setConnected]   = useState(initialConnected);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [pulsing, setPulsing]       = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res  = await fetch("/api/fleet", { cache: "no-store" });
+      const json = await res.json();
+      if (json.data) {
+        setFleet(json.data);
+        setConnected(Boolean(json.connected));
+        setLastUpdate(new Date());
+        setPulsing(true);
+        setTimeout(() => setPulsing(false), 600);
+      }
+    } catch {
+      // mantener datos anteriores
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(refresh, POLL_MS);
+    return () => clearInterval(id);
+  }, [refresh]);
+
   const latestVehicle = fleet.vehicles[0];
+
+  function fmt(d: Date | null) {
+    if (!d) return "--";
+    return d.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
 
   return (
     <section id="panel" className="section section-dark panel-grid">
@@ -16,29 +52,36 @@ export default function Dashboard({ fleet, connected, message }: Props) {
         <span className="eyebrow">Panel en vivo</span>
         <h2>Visibilidad operativa desde un solo punto.</h2>
         <p>
-          Mapa real, métricas reales y alertas reales. Si conectas tu backend GPS, esta
-          sección consume tu operación en tiempo real sin mockups.
+          Mapa real, metricas reales y alertas reales. Datos actualizados
+          automaticamente cada {POLL_MS / 1000}s.
         </p>
 
-        <div className="kpis">
-          <div className="kpi"><small>Activos</small><strong>{fleet.metrics.active}</strong></div>
-          <div className="kpi"><small>Alertas</small><strong>{fleet.metrics.alerts}</strong></div>
+        <div className={`kpis ${pulsing ? "kpis-pulse" : ""}`}>
+          <div className="kpi"><small>Activos</small><strong className="kpi-active">{fleet.metrics.active}</strong></div>
+          <div className="kpi"><small>Alertas</small><strong className="kpi-alert">{fleet.metrics.alerts}</strong></div>
           <div className="kpi"><small>Rutas</small><strong>{fleet.metrics.routes}</strong></div>
-          <div className="kpi"><small>Offline</small><strong>{fleet.metrics.offline}</strong></div>
+          <div className="kpi"><small>Offline</small><strong className="kpi-offline">{fleet.metrics.offline}</strong></div>
         </div>
 
-        {!connected ? (
+        <div className="live-status">
+          <span className={`live-dot ${connected ? "live-dot-on" : "live-dot-off"}`} />
+          <span className="live-label">{connected ? "Conectado" : "Sin conexion"}</span>
+          {lastUpdate && <span className="live-time">Actualizado {fmt(lastUpdate)}</span>}
+          <button className="refresh-btn" onClick={refresh} title="Actualizar ahora">R</button>
+        </div>
+
+        {!connected && (
           <div className="integration-note">
-            <strong>Integración pendiente</strong>
-            <p>{message || "Configura GPS_UPSTREAM_URL y GPS_API_KEY para mostrar tu flota real."}</p>
+            <strong>Integracion pendiente</strong>
+            <p>{message || "Configura GPS_UPSTREAM_URL en tu .env para mostrar tu flota real."}</p>
           </div>
-        ) : null}
+        )}
       </div>
 
       <div className="panel-card">
         <div className="panel-card-head">
           <span>Seguimiento</span>
-          <strong>{connected ? "Conectado" : "Sin conexión"}</strong>
+          <strong>{connected ? "En vivo" : "Sin senal"}</strong>
         </div>
 
         <FleetMap vehicles={fleet.vehicles} />
@@ -49,15 +92,15 @@ export default function Dashboard({ fleet, connected, message }: Props) {
             <strong>{latestVehicle?.name || "Sin unidades"}</strong>
             <span>
               {latestVehicle
-                ? `${latestVehicle.speed} km/h • ${latestVehicle.geofence || "Sin geocerca"}`
-                : "Esperando vehículos conectados"}
+                ? `${latestVehicle.speed} km/h - ${latestVehicle.geofence || "Sin geocerca"}`
+                : "Esperando vehiculos conectados"}
             </span>
           </div>
 
           <div className="alerts-list">
             <small>Actividad reciente</small>
             {fleet.alerts.length === 0 ? (
-              <div className="alert-row empty">No hay alertas cargadas.</div>
+              <div className="alert-row empty">Sin alertas activas.</div>
             ) : (
               fleet.alerts.slice(0, 3).map((alert) => (
                 <div className={`alert-row ${alert.severity}`} key={alert.id}>

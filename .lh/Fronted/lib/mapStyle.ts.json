@@ -1,0 +1,18 @@
+{
+    "sourceFile": "Fronted/lib/mapStyle.ts",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776623509879,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776623509879,
+            "name": "Commit-0",
+            "content": "import type { MapStyle } from \"react-map-gl/maplibre\";\r\n\r\nexport const mapStyle: MapStyle = {\r\n  version: 8,\r\n  sources: {\r\n    carto: {\r\n      type: \"raster\",\r\n      tiles: [\r\n        \"https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png\",\r\n        \"https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png\"\r\n      ],\r\n      tileSize: 256,\r\n      attribution: \"© OpenStreetMap contributors © CARTO\"\r\n    }\r\n  },\r\n  layers: [\r\n    {\r\n      id: \"carto-base\",\r\n      type: \"raster\",\r\n      source: \"carto\",\r\n      minzoom: 0,\r\n      maxzoom: 20,\r\n      paint: {\r\n        \"raster-saturation\": -0.05,\r\n        \"raster-contrast\": 0.1,\r\n        \"raster-brightness-min\": 0.28,\r\n        \"raster-brightness-max\": 0.92\r\n      }\r\n    }\r\n  ]\r\n};"
+        }
+    ]
+}
