@@ -3,11 +3,7 @@ import Dashboard from "@/components/Dashboard";
 import HeroGps from "@/components/HeroGps";
 import type { FleetPayload } from "@/lib/fleet";
 
-async function getFleetData(): Promise<{
-  connected: boolean;
-  message?: string;
-  data: FleetPayload;
-}> {
+async function getFleetData(): Promise<{ connected: boolean; message?: string; data: FleetPayload }> {
   const base = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   try {
@@ -17,7 +13,7 @@ async function getFleetData(): Promise<{
     return {
       connected: Boolean(json.connected),
       message: json.message,
-      data: json.data,
+      data: json.data
     };
   } catch {
     return {
@@ -31,9 +27,9 @@ async function getFleetData(): Promise<{
           idle: 0,
           offline: 0,
           alerts: 0,
-          routes: 0,
-        },
-      },
+          routes: 0
+        }
+      }
     };
   }
 }
@@ -41,16 +37,16 @@ async function getFleetData(): Promise<{
 const valueCards = [
   {
     title: "Control operativo",
-    text: "Visualiza cada unidad, entiende qué pasó y responde rápido cuando algo se sale de ruta.",
+    text: "Visualiza cada unidad, entiende qué pasó y responde rápido cuando algo se sale de ruta."
   },
   {
     title: "Menos pérdidas",
-    text: "Reduce tiempos muertos, movimientos no autorizados y falta de visibilidad en la operación.",
+    text: "Reduce tiempos muertos, movimientos no autorizados y falta de visibilidad en la operación."
   },
   {
     title: "Decisiones rápidas",
-    text: "Convierte ubicación, eventos y actividad en decisiones útiles para negocio o flota.",
-  },
+    text: "Convierte ubicación, eventos y actividad en decisiones útiles para negocio o flota."
+  }
 ];
 
 const plans = [
@@ -61,8 +57,8 @@ const plans = [
       "Ubicación en tiempo real",
       "Historial de recorridos",
       "Acceso móvil",
-      "Soporte básico",
-    ],
+      "Soporte básico"
+    ]
   },
   {
     name: "Pro",
@@ -71,9 +67,9 @@ const plans = [
       "Todo lo del Básico",
       "Geocercas",
       "Alertas avanzadas",
-      "Soporte prioritario",
+      "Soporte prioritario"
     ],
-    featured: true,
+    featured: true
   },
   {
     name: "Flotas",
@@ -82,9 +78,9 @@ const plans = [
       "Múltiples unidades",
       "Resumen operativo",
       "Control de rutas",
-      "Atención dedicada",
-    ],
-  },
+      "Atención dedicada"
+    ]
+  }
 ];
 
 export default async function HomePage() {
@@ -93,6 +89,7 @@ export default async function HomePage() {
   return (
     <main className="page-shell">
       <TopBar />
+
       <HeroGps />
 
       <section id="solucion" className="section intro-strip">
@@ -130,11 +127,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <Dashboard
-        fleet={fleet.data}
-        connected={fleet.connected}
-        message={fleet.message}
-      />
+      <Dashboard fleet={fleet.data} connected={fleet.connected} message={fleet.message} />
 
       <section id="planes" className="section pricing-section">
         <div className="section-head">
@@ -144,10 +137,7 @@ export default async function HomePage() {
 
         <div className="pricing-grid">
           {plans.map((plan) => (
-            <article
-              className={`price-card ${plan.featured ? "featured" : ""}`}
-              key={plan.name}
-            >
+            <article className={`price-card ${plan.featured ? "featured" : ""}`} key={plan.name}>
               {plan.featured ? <div className="badge">Más solicitado</div> : null}
 
               <h3>{plan.name}</h3>
