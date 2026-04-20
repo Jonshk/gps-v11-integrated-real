@@ -1,8 +1,7 @@
 import TopBar from "@/components/TopBar";
 import Dashboard from "@/components/Dashboard";
-import HeroGps from "@/components/HeroGps";
+import VideoHero from "@/components/VideoHero";
 import Footer from "@/components/Footer";
-import VideoSection from "@/components/VideoSection";
 import type { FleetPayload } from "@/lib/fleet";
 
 async function getFleetData(): Promise<{ connected: boolean; message?: string; data: FleetPayload }> {
@@ -39,7 +38,7 @@ const outcomes = [
     stat: "30s",
     label: "alerta",
     heading: "Reaccion antes de que sea tarde",
-    body: "Notificacion inmediata si un vehiculo sale de la zona permitida o se detiene sin aviso.",
+    body: "Notificacion inmediata si un vehiculo sale de zona o se detiene sin aviso.",
   },
 ];
 
@@ -73,7 +72,6 @@ const plans = [
 
 const PHONE = "593987654321";
 const EMAIL = "contacto@gpscontrolec.com";
-const MAPS = "https://maps.google.com/?q=Guayaquil,Ecuador";
 
 export default async function HomePage() {
   const fleet = await getFleetData();
@@ -82,39 +80,15 @@ export default async function HomePage() {
     <main className="page-shell">
       <TopBar />
 
-      {/* Barra de confianza */}
-      <div className="trust-bar">
-        <div className="trust-inner">
-          <div className="trust-item">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-            <span><strong>4.8 / 5</strong> -- +200 empresas en Ecuador</span>
-          </div>
-          <div className="trust-sep" />
-          <div className="trust-item">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
-            <span>Instalacion incluida en menos de 10 minutos</span>
-          </div>
-          <div className="trust-sep" />
-          <div className="trust-item">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>
-            <a href={`https://wa.me/${PHONE}`} target="_blank" rel="noreferrer">Soporte WhatsApp 24/7</a>
-          </div>
-          <div className="trust-sep" />
-          <div className="trust-item">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/></svg>
-            <a href={MAPS} target="_blank" rel="noreferrer">Guayaquil, Ecuador</a>
-          </div>
-        </div>
-      </div>
+      {/* Hero -- video pantalla completa */}
+      <VideoHero />
 
-      <HeroGps />
-
-      {/* Por que nosotros */}
+      {/* 3. Por que nosotros */}
       <section id="solucion" className="section section-white">
         <div className="outcomes-header">
           <span className="eyebrow-red">Por que GPS Control EC</span>
-          <h2>No vendemos rastreo.<br />Vendemos control.</h2>
-          <p className="outcomes-sub">Cada empresario que contrata GPS Control EC reduce perdidas en menos de 30 dias. Estos son los resultados reales.</p>
+          <h2>No vendemos rastreo. Vendemos control.</h2>
+          <p className="outcomes-sub">Resultados reales en menos de 30 dias.</p>
         </div>
         <div className="outcomes-grid" id="impacto">
           {outcomes.map((o) => (
@@ -134,44 +108,23 @@ export default async function HomePage() {
           ))}
         </div>
         <div className="features-strip">
-          <div className="feat-chip">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/></svg>
-            Ubicacion GPS tiempo real
-          </div>
-          <div className="feat-chip">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12 1.586l-4 4v12.828l4-4V1.586zM3.707 3.293A1 1 0 002 4v10a1 1 0 00.293.707L6 18.414V5.586L3.707 3.293zM17.707 5.293L14 1.586v12.828l2.293 2.293A1 1 0 0018 16V6a1 1 0 00-.293-.707z" clipRule="evenodd"/></svg>
-            Geocercas y zonas seguras
-          </div>
-          <div className="feat-chip">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
-            Alertas en tiempo real
-          </div>
-          <div className="feat-chip">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"/></svg>
-            Historial de recorridos
-          </div>
-          <div className="feat-chip">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clipRule="evenodd"/></svg>
-            App movil iOS y Android
-          </div>
-          <div className="feat-chip">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
-            Reportes y estadisticas
-          </div>
+          {["GPS tiempo real","Geocercas","Alertas push","Historial rutas","App movil","Reportes"].map(f => (
+            <div className="feat-chip" key={f}>
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+              {f}
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Video */}
-      <VideoSection />
-
-      {/* Panel */}
+      {/* 4. Dashboard */}
       <Dashboard fleet={fleet.data} connected={fleet.connected} message={fleet.message} />
 
-      {/* Planes */}
+      {/* 5. Planes */}
       <section id="planes" className="section section-white">
         <div className="outcomes-header">
           <span className="eyebrow-red">Planes</span>
-          <h2>Sin contratos. Sin permanencia.<br />Cancela cuando quieras.</h2>
+          <h2>Sin contratos. Cancela cuando quieras.</h2>
         </div>
         <div className="pricing-grid">
           {plans.map((plan) => (
@@ -194,7 +147,7 @@ export default async function HomePage() {
                 ))}
               </ul>
               <a
-                href={`https://wa.me/${PHONE}?text=Quiero el plan ${plan.name} de GPS Control EC`}
+                href={`https://wa.me/${PHONE}?text=Quiero el plan ${plan.name}`}
                 target="_blank"
                 rel="noreferrer"
                 className={plan.featured ? "btn-plan-primary" : "btn-plan-outline"}
@@ -206,13 +159,13 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* CTA final */}
+      {/* 6. CTA final */}
       <section id="contacto" className="section section-dark-cta">
         <div className="cta-inner">
           <div className="cta-copy">
             <span className="eyebrow-light">Empieza hoy</span>
             <h2>Tu flota bajo control desde el primer dia.</h2>
-            <p>Instalacion incluida. Soporte en espanol. Sin letra pequenya.</p>
+            <p>Instalacion incluida. Soporte en espanol. Sin letra pequenia.</p>
           </div>
           <div className="cta-actions">
             <a
