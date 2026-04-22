@@ -13,11 +13,11 @@ type Props = {
 const POLL_MS = 20000;
 
 const DEMO_VEHICLES = [
-  { id:"d1", name:"ECU-204", status:"active"  as const, lat:-2.1704, lng:-79.8895, speed:62, geofence:"Zona centro",  updatedAt:"" },
-  { id:"d2", name:"ECU-107", status:"idle"    as const, lat:-2.1550, lng:-79.9012, speed:0,  geofence:"Zona norte",  updatedAt:"" },
-  { id:"d3", name:"ECU-301", status:"offline" as const, lat:-2.1842, lng:-79.8763, speed:0,  geofence:"",            updatedAt:"" },
-  { id:"d4", name:"ECU-088", status:"active"  as const, lat:-2.1630, lng:-79.8950, speed:44, geofence:"Zona sur",    updatedAt:"" },
-  { id:"d5", name:"ECU-412", status:"active"  as const, lat:-2.1780, lng:-79.8820, speed:71, geofence:"Zona este",   updatedAt:"" },
+  { id:"d1", name:"ECU-204", status:"active"  as const, lat:-2.1523, lng:-79.8731, speed:62, geofence:"Zona centro",  updatedAt:"" },
+  { id:"d2", name:"ECU-107", status:"idle"    as const, lat:-2.2105, lng:-79.9234, speed:0,  geofence:"Zona norte",  updatedAt:"" },
+  { id:"d3", name:"ECU-301", status:"offline" as const, lat:-2.1340, lng:-79.8412, speed:0,  geofence:"",            updatedAt:"" },
+  { id:"d4", name:"ECU-088", status:"active"  as const, lat:-2.1876, lng:-79.9501, speed:44, geofence:"Zona sur",    updatedAt:"" },
+  { id:"d5", name:"ECU-412", status:"active"  as const, lat:-2.1090, lng:-79.9088, speed:71, geofence:"Zona este",   updatedAt:"" },
 ];
 
 const DEMO_METRICS = { active:3, idle:1, offline:1, alerts:2, routes:18 };
@@ -153,12 +153,6 @@ export default function Dashboard({ fleet: liveFleet, connected }: Props) {
             }
           </div>
 
-          {showDemo && (
-            <div className="dash-demo-note">
-              <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"/></svg>
-              <span>Vista de demostracion. Conecta tu flota real con GPS_UPSTREAM_URL.</span>
-            </div>
-          )}
         </div>
 
         {/* Mapa */}

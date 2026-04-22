@@ -556,17 +556,26 @@ img,video{display:block;max-width:100%}
 
 /* === DASHBOARD V2 === */
 .dash-section{
-  background:var(--dark);
-  padding:72px 40px 80px;
-  border-top:1px solid rgba(255,255,255,.05);
+  background:linear-gradient(180deg,#060d18 0%,#080f1c 100%);
+  padding:72px 48px 80px;
+  border-top:2px solid rgba(0,212,160,.12);
+  position:relative;
+}
+.dash-section::before{
+  content:"";
+  position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse at 20% 0%,rgba(0,212,160,.06) 0%,transparent 50%),
+    radial-gradient(ellipse at 80% 100%,rgba(0,100,255,.05) 0%,transparent 50%);
 }
 .dash-header{
-  max-width:1200px;margin:0 auto 32px;
+  max-width:100%;margin:0 0 32px;
   display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+  position:relative;z-index:1;
 }
 .dash-header-left h2{
-  font-size:clamp(1.6rem,2.5vw,2.2rem);
-  font-weight:800;letter-spacing:-.03em;line-height:1.1;
+  font-size:clamp(1.8rem,3vw,2.8rem);
+  font-weight:800;letter-spacing:-.04em;line-height:1.0;
   color:var(--text-light);margin-top:8px;
 }
 .dash-header-right{display:flex;align-items:center;gap:12px;}
@@ -588,23 +597,32 @@ img,video{display:block;max-width:100%}
 .dash-refresh svg{width:15px;height:15px;}
 
 .dash-body{
-  max-width:1200px;margin:0 auto;
-  display:grid;grid-template-columns:300px 1fr;gap:20px;
-  align-items:start;
+  display:grid;grid-template-columns:320px 1fr;gap:24px;
+  align-items:stretch;
+  position:relative;z-index:1;
+}
+
+.dash-left{
+  display:flex;flex-direction:column;
+  gap:10px;
+  min-height:0;
 }
 
 /* KPIs */
 .dash-kpis{
-  display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
   margin-bottom:16px;transition:opacity .3s;
 }
 .dash-kpis.pulsing{opacity:.55}
 .dash-kpi{
   display:flex;align-items:center;gap:12px;
-  padding:14px 14px;
-  background:var(--dark-card);border:1px solid var(--dark-border);
+  padding:16px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
   border-radius:var(--r12);
+  transition:border-color .15s;
 }
+.dash-kpi:hover{border-color:rgba(255,255,255,.14);}
 .dk-icon{
   width:32px;height:32px;border-radius:var(--r8);
   display:grid;place-items:center;flex-shrink:0;
@@ -620,8 +638,9 @@ img,video{display:block;max-width:100%}
 
 /* Vehicle list */
 .dash-vehicle-list{
-  background:var(--dark-card);border:1px solid var(--dark-border);
-  border-radius:var(--r12);overflow:hidden;margin-bottom:12px;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:var(--r12);overflow:hidden;margin-bottom:10px;
 }
 .dvl-header{
   display:flex;justify-content:space-between;align-items:center;
@@ -665,8 +684,10 @@ img,video{display:block;max-width:100%}
 
 /* Alerts */
 .dash-alerts{
-  background:var(--dark-card);border:1px solid var(--dark-border);
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.08);
   border-radius:var(--r12);overflow:hidden;
+  flex:1;
 }
 .da-empty{padding:14px;font-size:.78rem;color:rgba(200,218,238,.35);text-align:center;}
 .da-row{
@@ -680,12 +701,17 @@ img,video{display:block;max-width:100%}
 .da-row span{display:block;font-size:.68rem;color:rgba(200,218,238,.4);margin-top:1px;}
 
 /* Map col */
-.dash-map-col{display:flex;flex-direction:column;gap:10px;}
+.dash-map-col{
+  display:flex;flex-direction:column;
+  gap:10px;
+  min-height:0;
+}
 .dash-map-wrap{
   position:relative;
-  border-radius:var(--r16);overflow:hidden;
-  border:1px solid var(--dark-border);
-  height:480px;background:#060f1a;
+  border-radius:var(--r12);overflow:hidden;
+  border:1px solid rgba(255,255,255,.1);
+  flex:1;min-height:480px;background:#060f1a;
+  box-shadow:0 0 0 1px rgba(0,212,160,.06),0 24px 48px rgba(0,0,0,.4);
 }
 .dash-map-wrap .live-map-wrap{height:100%;border:none;border-radius:0;}
 .dash-vehicle-card{
@@ -736,6 +762,8 @@ img,video{display:block;max-width:100%}
 @media (max-width:1180px){
   .hs-inner{grid-template-columns:1fr;gap:24px;padding:40px 28px 28px;}
   .dash-body{grid-template-columns:1fr;}
+  .dash-section{padding:56px 28px 64px;}
+  .dash-map-wrap{height:380px;}
   .dash-map-wrap{height:380px;}
 
   .hero-gps{grid-template-columns:1fr}
