@@ -25,6 +25,7 @@ export default function TopBar() {
   return (
     <>
       <header className={`topbar ${solid ? "solid" : ""}`}>
+        {/* Logo -- siempre visible */}
         <a href="/" className="brand">
           <svg className="brand-icon" viewBox="0 0 28 28" fill="none">
             <circle cx="14" cy="12" r="8" stroke="currentColor" strokeWidth="2"/>
@@ -32,35 +33,36 @@ export default function TopBar() {
             <path d="M14 20 L14 26" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             <circle cx="14" cy="26" r="1.5" fill="currentColor"/>
           </svg>
-          <span>{BRAND}</span>
+          <span className="brand-full">{BRAND}</span>
+          <span className="brand-short">GPSEC</span>
         </a>
 
+        {/* Nav links -- solo desktop */}
         <nav className="topnav">
           {NAV.map((n) => (
             <a key={n.href} href={n.href}>{n.label}</a>
           ))}
         </nav>
 
-        {/* Trust chips dentro del nav */}
+        {/* Trust chips -- solo desktop */}
         <div className="topbar-trust">
           <span className="tb-trust-chip">
             <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
             4.8/5
           </span>
           <span className="tb-trust-sep" />
-          <a
-            href={`https://wa.me/${PHONE}`}
-            target="_blank"
-            rel="noreferrer"
-            className="tb-trust-chip tb-trust-wa"
-          >
+          <a href={`https://wa.me/${PHONE}`} target="_blank" rel="noreferrer" className="tb-trust-chip tb-trust-wa">
             <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>
             WhatsApp 24/7
           </a>
         </div>
 
+        {/* Right side */}
         <div className="topbar-right">
+          {/* Telefono -- solo desktop */}
           <a href={`tel:+${PHONE}`} className="nav-phone">+593 98 765 4321</a>
+
+          {/* CTA -- siempre visible */}
           <a
             href={`https://wa.me/${PHONE}?text=Quiero una demo`}
             target="_blank"
@@ -69,6 +71,8 @@ export default function TopBar() {
           >
             Demo gratis
           </a>
+
+          {/* Hamburguesa -- solo movil */}
           <button
             className={`burger ${open ? "open" : ""}`}
             aria-label="Menu"
@@ -79,10 +83,19 @@ export default function TopBar() {
         </div>
       </header>
 
+      {/* Menu movil */}
       <nav className={`mobile-nav ${open ? "open" : ""}`}>
         {NAV.map((n) => (
           <a key={n.href} href={n.href} onClick={() => setOpen(false)}>{n.label}</a>
         ))}
+        <div className="mobile-nav-trust">
+          <span>
+            <svg viewBox="0 0 20 20" fill="currentColor" style={{width:12,height:12}}><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+            4.8/5 valoracion
+          </span>
+          <span>Sin permanencia</span>
+          <span>Guayaquil, Ecuador</span>
+        </div>
         <a
           href={`https://wa.me/${PHONE}`}
           target="_blank"
@@ -91,6 +104,9 @@ export default function TopBar() {
           onClick={() => setOpen(false)}
         >
           Demo gratis por WhatsApp
+        </a>
+        <a href={`tel:+${PHONE}`} className="mobile-phone" onClick={() => setOpen(false)}>
+          +593 98 765 4321
         </a>
       </nav>
     </>
