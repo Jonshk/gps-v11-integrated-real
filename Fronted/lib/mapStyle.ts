@@ -1,6 +1,6 @@
-import type { MapStyle } from "react-map-gl/maplibre";
+import type { StyleSpecification } from "maplibre-gl";
 
-export const mapStyle: MapStyle = {
+export const mapStyle: StyleSpecification = {
   version: 8,
   sources: {
     carto: {
