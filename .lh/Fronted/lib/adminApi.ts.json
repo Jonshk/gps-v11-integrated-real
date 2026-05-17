@@ -1,0 +1,18 @@
+{
+    "sourceFile": "Fronted/lib/adminApi.ts",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1779040649254,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1779040649254,
+            "name": "Commit-0",
+            "content": "// lib/adminApi.ts\nconst BASE =\n  process.env.NEXT_PUBLIC_API_URL ||\n  process.env.NEXT_PUBLIC_API_BASE ||\n  \"http://localhost:8000\";\n\nfunction getToken(): string | null {\n  if (typeof window === \"undefined\") return null;\n  return localStorage.getItem(\"admin_token\");\n}\n\nasync function req<T>(\n  method: string,\n  path: string,\n  body?: unknown\n): Promise<T> {\n  const token = getToken();\n  const res = await fetch(`${BASE}${path}`, {\n    method,\n    headers: {\n      \"Content-Type\": \"application/json\",\n      ...(token ? { \"x-admin-token\": token } : {}),\n    },\n    body: body ? JSON.stringify(body) : undefined,\n    cache: \"no-store\",\n  });\n  if (res.status === 401) {\n    if (typeof window !== \"undefined\") {\n      localStorage.removeItem(\"admin_token\");\n      window.location.href = \"/admin\";\n    }\n    throw new Error(\"No autorizado\");\n  }\n  if (!res.ok) {\n    const err = await res.json().catch(() => ({}));\n    throw new Error(err.detail || `Error ${res.status}`);\n  }\n  return res.json() as Promise<T>;\n}\n\nexport const adminApi = {\n  login: (password: string) =>\n    req<{ ok: boolean; token: string }>(\"POST\", \"/admin/login\", { password }),\n\n  logout: () => req(\"POST\", \"/admin/logout\"),\n\n  // Dispositivos GPS\n  getDevices: () => req<GpsDevice[]>(\"GET\", \"/admin/devices\"),\n  createDevice: (data: Partial<GpsDevice>) =>\n    req<GpsDevice>(\"POST\", \"/admin/devices\", data),\n  updateDevice: (id: string, data: Partial<GpsDevice>) =>\n    req<GpsDevice>(\"PATCH\", `/admin/devices/${id}`, data),\n  deleteDevice: (id: string) =>\n    req(\"DELETE\", `/admin/devices/${id}`),\n\n  // Clientes\n  getClients: () => req<AppClient[]>(\"GET\", \"/admin/clients\"),\n  createClient: (data: Partial<AppClient>) =>\n    req<AppClient>(\"POST\", \"/admin/clients\", data),\n  updateClient: (id: string, data: Partial<AppClient>) =>\n    req<AppClient>(\"PATCH\", `/admin/clients/${id}`, data),\n  deleteClient: (id: string) =>\n    req(\"DELETE\", `/admin/clients/${id}`),\n  toggleClient: (id: string) =>\n    req<AppClient>(\"POST\", `/admin/clients/${id}/toggle`),\n\n  // Vehículos (lista para selects)\n  getVehicles: () => req<Vehicle[]>(\"GET\", \"/vehicles\"),\n};\n\n// ── Tipos ─────────────────────────────────────────────────────────────────\n\nexport type GpsDevice = {\n  id: string;\n  name: string;\n  sim_number: string;\n  model?: string;\n  imei?: string;\n  vehicle_id?: string;\n  vehicle_name?: string;\n  client_name?: string;\n  username?: string;\n  active: number;\n  notes?: string;\n  created_at: string;\n};\n\nexport type AppClient = {\n  id: string;\n  username: string;\n  password: string;\n  client_name: string;\n  email?: string;\n  phone?: string;\n  vehicle_id?: string;\n  vehicle_name?: string;\n  gps_device_id?: string;\n  device_name?: string;\n  sim_number?: string;\n  device_model?: string;\n  active: number;\n  created_at: string;\n};\n\nexport type Vehicle = {\n  id: string;\n  name: string;\n  status: string;\n  lat: number;\n  lng: number;\n};"
+        }
+    ]
+}
