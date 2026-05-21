@@ -1,28 +1,13 @@
 from __future__ import annotations
-"""
-ADMIN ROUTES — pegar al final de main.py (o incluir como router)
-================================================================
-Requiere añadir al inicio de main.py:
-    from app.admin_repository import (
-        get_all_devices, get_device, create_device, update_device, delete_device,
-        get_all_clients, get_client, create_client, update_client,
-        delete_client, toggle_client_active, get_client_for_login,
-    )
-    from app.config import ADMIN_PASSWORD
-    import secrets as _secrets
-
-Y en config.py añadir:
-    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
-"""
 
 import secrets as _secrets
 from fastapi import Depends, FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
 
-# ── Sesiones admin en memoria ─────────────────────────────────────────────
+# ── Sesiones en memoria ───────────────────────────────────────────────────
 _admin_sessions: set[str] = set()
-_app_tokens: dict[str, str] = {}   # token → client_id
+_app_tokens: dict[str, str] = {}
 
 
 def _require_admin(x_admin_token: str | None = Header(default=None)) -> None:
@@ -80,18 +65,17 @@ class AppLoginRequest(BaseModel):
     username: str
     password: str
 
+class SmsCommandRequest(BaseModel):
+    command: str
+    client_id: str
+
 
 def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
-    """
-    Llama a esta función desde main.py pasando una lambda que devuelva ADMIN_PASSWORD:
-        register_admin_routes(app, lambda: ADMIN_PASSWORD)
-    """
 
     # ── Admin login ───────────────────────────────────────────────────────
 
     @app.post("/admin/login")
     def admin_login(payload: AdminLogin):
-        from app.admin_repository import get_all_clients  # import tardío para evitar circular
         if payload.password != admin_password_getter():
             raise HTTPException(status_code=401, detail="Contraseña incorrecta.")
         token = _secrets.token_hex(32)
@@ -193,6 +177,48 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
         if not cli:
             raise HTTPException(status_code=404, detail="Cliente no encontrado.")
         return cli
+
+    # ── SMS Commands via Twilio ───────────────────────────────────────────
+
+    @app.post("/admin/sms/send", dependencies=[Depends(_require_admin)])
+    def send_sms_command(payload: SmsCommandRequest):
+        """
+        Envía un comando SMS al GPS del cliente via Twilio.
+        El número SIM viene del dispositivo asignado al cliente — nunca del frontend.
+        """
+        from app.admin_repository import get_client
+        from app.sms_service import send_gps_command
+
+        cli = get_client(payload.client_id)
+        if not cli:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado.")
+
+        sim_number = cli.get("sim_number") or cli.get("gps_sim")
+        if not sim_number:
+            # Intentar obtener SIM desde el dispositivo asignado
+            from app.admin_repository import get_device
+            device_id = cli.get("gps_device_id")
+            if device_id:
+                dev = get_device(device_id)
+                sim_number = dev.get("sim_number") if dev else None
+
+        if not sim_number:
+            raise HTTPException(
+                status_code=400,
+                detail="Este cliente no tiene un GPS con SIM asignado.")
+
+        result = send_gps_command(payload.command, sim_number)
+
+        if not result["ok"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    @app.get("/admin/sms/commands", dependencies=[Depends(_require_admin)])
+    def list_sms_commands():
+        """Lista todos los comandos GPS disponibles."""
+        from app.sms_service import get_available_commands
+        return get_available_commands()
 
     # ── App login (APK del cliente) ───────────────────────────────────────
 
