@@ -1,7 +1,18 @@
 from __future__ import annotations
+
 import uuid
 from app.db import get_conn
 from app.utils import now_iso
+
+
+def to_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value in (1, "1", "true", "True", "TRUE", "yes", "on"):
+        return True
+    if value in (0, "0", "false", "False", "FALSE", "no", "off"):
+        return False
+    return bool(value)
 
 
 # ── GPS Devices ───────────────────────────────────────────────────────────
@@ -63,7 +74,10 @@ def update_device(device_id: str, data: dict) -> dict | None:
     if not dev:
         return None
 
-    merged = {**dev, **{k: v for k, v in data.items() if v is not None}}
+    merged = {
+        **dev,
+        **{k: v for k, v in data.items() if v is not None},
+    }
 
     with get_conn() as conn:
         cur = conn.cursor()
@@ -83,7 +97,7 @@ def update_device(device_id: str, data: dict) -> dict | None:
             merged.get("model"),
             merged.get("imei"),
             merged.get("vehicle_id") or None,
-            merged.get("active", True),
+            to_bool(merged.get("active", True)),
             merged.get("notes"),
             device_id,
         ))
@@ -163,7 +177,10 @@ def update_client(client_id: str, data: dict) -> dict | None:
     if not cli:
         return None
 
-    merged = {**cli, **{k: v for k, v in data.items() if v is not None}}
+    merged = {
+        **cli,
+        **{k: v for k, v in data.items() if v is not None},
+    }
 
     with get_conn() as conn:
         cur = conn.cursor()
@@ -186,7 +203,7 @@ def update_client(client_id: str, data: dict) -> dict | None:
             merged.get("phone"),
             merged.get("vehicle_id") or None,
             merged.get("gps_device_id") or None,
-            merged.get("active", True),
+            to_bool(merged.get("active", True)),
             client_id,
         ))
 
@@ -205,11 +222,14 @@ def toggle_client_active(client_id: str) -> dict | None:
     if not cli:
         return None
 
-    new_val = False if cli["active"] else True
+    new_val = not to_bool(cli.get("active", True))
 
     with get_conn() as conn:
         cur = conn.cursor()
-        cur.execute("UPDATE app_clients SET active=%s WHERE id=%s", (new_val, client_id))
+        cur.execute(
+            "UPDATE app_clients SET active=%s WHERE id=%s",
+            (new_val, client_id),
+        )
 
     return get_client(client_id)
 
@@ -228,5 +248,6 @@ def get_client_for_login(username: str, password: str) -> dict | None:
               AND c.password=%s
               AND c.active=TRUE
         """, (username, password))
+
         row = cur.fetchone()
         return dict(row) if row else None
