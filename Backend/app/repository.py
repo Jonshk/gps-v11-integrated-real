@@ -1,129 +1,136 @@
 from __future__ import annotations
-
+import uuid
 from app.db import get_conn
-from app.utils import now_iso
+from app.utils import now_iso, random_shift
 
-def seed_if_empty() -> None:
-    with get_conn() as conn:
-        cur = conn.cursor()
-        total = cur.execute("SELECT COUNT(*) AS total FROM vehicles").fetchone()["total"]
-        if total > 0:
-            return
-
-        created_at = now_iso()
-        vehicles = [
-            ("veh-1", "ECU-204", "active", -2.1704, -79.8895, 62, "Zona centro", created_at),
-            ("veh-2", "ECU-107", "idle", -2.1550, -79.9012, 0, "Zona norte", created_at),
-            ("veh-3", "ECU-301", "offline", -2.1842, -79.8763, 0, None, created_at),
-        ]
-        cur.executemany(
-            "INSERT INTO vehicles (id, name, status, lat, lng, speed, geofence, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            vehicles,
-        )
-
-        for vehicle in vehicles:
-            cur.execute(
-                "INSERT INTO positions (vehicle_id, lat, lng, speed, created_at) VALUES (?, ?, ?, ?, ?)",
-                (vehicle[0], vehicle[3], vehicle[4], vehicle[5], created_at),
-            )
-
-        alerts = [
-            ("alert-1", "movement", "Movimiento detectado", created_at, "medium"),
-            ("alert-2", "geofence", "Ingreso a geocerca", created_at, "low"),
-        ]
-        cur.executemany(
-            "INSERT INTO alerts (id, type, message, created_at, severity) VALUES (?, ?, ?, ?, ?)",
-            alerts,
-        )
+# ── Vehicles ──────────────────────────────────────────────────────────────
 
 def get_all_vehicles() -> list[dict]:
     with get_conn() as conn:
-        return conn.cursor().execute("SELECT * FROM vehicles ORDER BY updated_at DESC, name ASC").fetchall()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM vehicles ORDER BY updated_at DESC")
+        return [dict(r) for r in cur.fetchall()]
 
 def get_vehicle(vehicle_id: str) -> dict | None:
     with get_conn() as conn:
-        return conn.cursor().execute("SELECT * FROM vehicles WHERE id = ?", (vehicle_id,)).fetchone()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM vehicles WHERE id = %s", (vehicle_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
 
-def create_vehicle(payload: dict) -> dict:
-    data = {**payload, "updated_at": now_iso()}
+def create_vehicle(data: dict) -> dict:
     with get_conn() as conn:
         cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO vehicles (id, name, status, lat, lng, speed, geofence, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (data["id"], data["name"], data["status"], data["lat"], data["lng"], data["speed"], data.get("geofence"), data["updated_at"]),
-        )
-        cur.execute(
-            "INSERT INTO positions (vehicle_id, lat, lng, speed, created_at) VALUES (?, ?, ?, ?, ?)",
-            (data["id"], data["lat"], data["lng"], data["speed"], data["updated_at"]),
-        )
+        cur.execute("""
+            INSERT INTO vehicles (id, name, status, lat, lng, speed, geofence, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            data["id"], data["name"], data.get("status", "idle"),
+            data.get("lat", 0), data.get("lng", 0),
+            data.get("speed", 0), data.get("geofence"),
+            now_iso(),
+        ))
     return get_vehicle(data["id"])
 
-def update_vehicle(vehicle_id: str, payload: dict) -> dict | None:
-    current = get_vehicle(vehicle_id)
-    if not current:
+def update_vehicle(vehicle_id: str, data: dict) -> dict | None:
+    v = get_vehicle(vehicle_id)
+    if not v:
         return None
-    merged = {**current, **{k: v for k, v in payload.items() if v is not None}, "updated_at": now_iso()}
+    merged = {**v, **data}
     with get_conn() as conn:
-        conn.cursor().execute(
-            "UPDATE vehicles SET name = ?, status = ?, lat = ?, lng = ?, speed = ?, geofence = ?, updated_at = ? WHERE id = ?",
-            (merged["name"], merged["status"], merged["lat"], merged["lng"], merged["speed"], merged.get("geofence"), merged["updated_at"], vehicle_id),
-        )
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE vehicles SET name=%s, status=%s, lat=%s, lng=%s,
+            speed=%s, geofence=%s, updated_at=%s WHERE id=%s
+        """, (
+            merged["name"], merged["status"], merged["lat"], merged["lng"],
+            merged["speed"], merged.get("geofence"), now_iso(), vehicle_id,
+        ))
     return get_vehicle(vehicle_id)
 
 def delete_vehicle(vehicle_id: str) -> bool:
     with get_conn() as conn:
         cur = conn.cursor()
-        cur.execute("DELETE FROM positions WHERE vehicle_id = ?", (vehicle_id,))
-        cur.execute("DELETE FROM vehicles WHERE id = ?", (vehicle_id,))
+        cur.execute("DELETE FROM vehicles WHERE id = %s", (vehicle_id,))
         return cur.rowcount > 0
 
 def add_position(vehicle_id: str, lat: float, lng: float, speed: float, geofence: str | None) -> dict | None:
-    vehicle = get_vehicle(vehicle_id)
-    if not vehicle:
+    v = get_vehicle(vehicle_id)
+    if not v:
         return None
-    created_at = now_iso()
     with get_conn() as conn:
         cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO positions (vehicle_id, lat, lng, speed, created_at) VALUES (?, ?, ?, ?, ?)",
-            (vehicle_id, lat, lng, speed, created_at),
-        )
-        cur.execute(
-            "UPDATE vehicles SET lat = ?, lng = ?, speed = ?, geofence = ?, updated_at = ?, status = ? WHERE id = ?",
-            (lat, lng, speed, geofence, created_at, "active" if speed > 0 else "idle", vehicle_id),
-        )
+        cur.execute("""
+            INSERT INTO positions (vehicle_id, lat, lng, speed, created_at)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (vehicle_id, lat, lng, speed, now_iso()))
+        cur.execute("""
+            UPDATE vehicles SET lat=%s, lng=%s, speed=%s, geofence=%s, updated_at=%s
+            WHERE id=%s
+        """, (lat, lng, speed, geofence, now_iso(), vehicle_id))
     return get_vehicle(vehicle_id)
 
 def get_positions(vehicle_id: str, limit: int = 20) -> list[dict]:
     with get_conn() as conn:
-        return conn.cursor().execute(
-            "SELECT * FROM positions WHERE vehicle_id = ? ORDER BY id DESC LIMIT ?",
-            (vehicle_id, limit),
-        ).fetchall()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT * FROM positions WHERE vehicle_id = %s
+            ORDER BY created_at DESC LIMIT %s
+        """, (vehicle_id, limit))
+        return [dict(r) for r in cur.fetchall()]
+
+# ── Alerts ────────────────────────────────────────────────────────────────
 
 def get_alerts(limit: int = 20) -> list[dict]:
     with get_conn() as conn:
-        return conn.cursor().execute(
-            "SELECT * FROM alerts ORDER BY created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM alerts ORDER BY created_at DESC LIMIT %s", (limit,))
+        return [dict(r) for r in cur.fetchall()]
 
-def create_alert(payload: dict) -> dict:
-    created_at = now_iso()
+def create_alert(data: dict) -> dict:
     with get_conn() as conn:
-        conn.cursor().execute(
-            "INSERT INTO alerts (id, type, message, created_at, severity) VALUES (?, ?, ?, ?, ?)",
-            (payload["id"], payload["type"], payload["message"], created_at, payload["severity"]),
-        )
-    with get_conn() as conn:
-        return conn.cursor().execute("SELECT * FROM alerts WHERE id = ?", (payload["id"],)).fetchone()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO alerts (id, type, message, created_at, severity)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
+        """, (
+            data.get("id", str(uuid.uuid4())),
+            data["type"], data["message"],
+            now_iso(), data.get("severity", "low"),
+        ))
+    return data
+
+# ── Metrics ───────────────────────────────────────────────────────────────
 
 def get_metrics() -> dict:
     with get_conn() as conn:
         cur = conn.cursor()
-        active = cur.execute("SELECT COUNT(*) AS total FROM vehicles WHERE status = 'active'").fetchone()["total"]
-        idle = cur.execute("SELECT COUNT(*) AS total FROM vehicles WHERE status = 'idle'").fetchone()["total"]
-        offline = cur.execute("SELECT COUNT(*) AS total FROM vehicles WHERE status = 'offline'").fetchone()["total"]
-        alerts = cur.execute("SELECT COUNT(*) AS total FROM alerts").fetchone()["total"]
-        routes = cur.execute("SELECT COUNT(*) AS total FROM positions").fetchone()["total"]
-        return {"active": active, "idle": idle, "offline": offline, "alerts": alerts, "routes": routes}
+        cur.execute("SELECT status, COUNT(*) as n FROM vehicles GROUP BY status")
+        rows = {r["status"]: r["n"] for r in cur.fetchall()}
+        cur.execute("SELECT COUNT(*) as n FROM alerts WHERE created_at > %s", (now_iso()[:10],))
+        alert_count = cur.fetchone()["n"]
+    return {
+        "active":  rows.get("active", 0),
+        "idle":    rows.get("idle", 0),
+        "offline": rows.get("offline", 0),
+        "alerts":  alert_count,
+        "routes":  rows.get("active", 0),
+    }
+
+# ── Seed ──────────────────────────────────────────────────────────────────
+
+def seed_if_empty() -> None:
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) as n FROM vehicles")
+        if cur.fetchone()["n"] > 0:
+            return
+
+    seed_vehicles = [
+        {"id": "veh-1", "name": "ECU-204", "status": "active",  "lat": -2.1704, "lng": -79.8895, "speed": 62,  "geofence": "Zona centro"},
+        {"id": "veh-2", "name": "ECU-107", "status": "idle",    "lat": -2.1550, "lng": -79.9012, "speed": 0,   "geofence": "Zona norte"},
+        {"id": "veh-3", "name": "ECU-301", "status": "offline", "lat": -2.1842, "lng": -79.8763, "speed": 0,   "geofence": None},
+    ]
+    for v in seed_vehicles:
+        create_vehicle(v)

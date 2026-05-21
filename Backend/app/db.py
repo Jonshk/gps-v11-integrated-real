@@ -1,27 +1,23 @@
 from __future__ import annotations
-
-import sqlite3
+import os
 from contextlib import contextmanager
-from pathlib import Path
+import psycopg
+from psycopg.rows import dict_row
 
-from app.config import DB_FILE
-
-DB_PATH = Path(DB_FILE)
-
-def dict_factory(cursor: sqlite3.Cursor, row: tuple) -> dict:
-    return {col[0]: row[idx] for idx, col in enumerate(cursor.description)}
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres.ibojygwdtrrcwsguboak:Caracas2026**@aws-1-sa-east-1.pooler.supabase.com:6543/postgres"
+)
 
 @contextmanager
 def get_conn():
-    if DB_PATH.parent.name not in ("", "."):
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH.as_posix())
-    conn.row_factory = dict_factory
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
+    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
     try:
         yield conn
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -29,7 +25,6 @@ def init_db() -> None:
     with get_conn() as conn:
         cur = conn.cursor()
 
-        # Tabla existente: vehículos (posición GPS en tiempo real)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS vehicles (
                 id TEXT PRIMARY KEY,
@@ -43,10 +38,9 @@ def init_db() -> None:
             )
         """)
 
-        # Tabla existente: posiciones históricas
         cur.execute("""
             CREATE TABLE IF NOT EXISTS positions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 vehicle_id TEXT NOT NULL,
                 lat REAL NOT NULL,
                 lng REAL NOT NULL,
@@ -56,7 +50,6 @@ def init_db() -> None:
             )
         """)
 
-        # Tabla existente: alertas
         cur.execute("""
             CREATE TABLE IF NOT EXISTS alerts (
                 id TEXT PRIMARY KEY,
@@ -67,7 +60,6 @@ def init_db() -> None:
             )
         """)
 
-        # NUEVA: dispositivos GPS físicos
         cur.execute("""
             CREATE TABLE IF NOT EXISTS gps_devices (
                 id TEXT PRIMARY KEY,
@@ -82,7 +74,6 @@ def init_db() -> None:
             )
         """)
 
-        # NUEVA: clientes (usuarios de la app móvil)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS app_clients (
                 id TEXT PRIMARY KEY,
@@ -98,7 +89,24 @@ def init_db() -> None:
             )
         """)
 
-        # Índices
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS plans (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                price TEXT NOT NULL,
+                sub TEXT NOT NULL,
+                description TEXT NOT NULL,
+                features JSONB NOT NULL DEFAULT '[]',
+                featured BOOLEAN NOT NULL DEFAULT FALSE,
+                wa_msg TEXT NOT NULL,
+                cta TEXT NOT NULL,
+                active BOOLEAN NOT NULL DEFAULT TRUE,
+                sort_order INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+
         cur.execute("CREATE INDEX IF NOT EXISTS idx_positions_vehicle ON positions(vehicle_id)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_clients_username ON app_clients(username)")
+
+    from app.plans_repository import init_plans_table
+    init_plans_table()
