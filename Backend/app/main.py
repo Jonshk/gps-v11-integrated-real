@@ -8,32 +8,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import APP_NAME, ADMIN_PASSWORD
 from app.db import init_db
 from app.repository import (
-    add_position,
-    create_alert,
-    create_vehicle,
-    delete_vehicle,
-    get_alerts,
-    get_all_vehicles,
-    get_metrics,
-    get_positions,
-    get_vehicle,
-    seed_if_empty,
-    update_vehicle,
+    add_position, create_alert, create_vehicle, delete_vehicle,
+    get_alerts, get_all_vehicles, get_metrics, get_positions,
+    get_vehicle, seed_if_empty, update_vehicle,
 )
 from app.schemas import AlertCreate, FleetResponse, PositionCreate, VehicleCreate, VehicleUpdate
 from app.security import require_write_key
 from app.utils import now_iso, random_shift
-from app.admin_routes import register_admin_routes
+from app.admin_routes import register_admin_routes, _require_admin
+from app.plans_routes import register_plan_routes
 
-app = FastAPI(title=APP_NAME, version="2.0.1")
+app = FastAPI(title=APP_NAME, version="2.1.0")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://gpscontrolec.com",
         "https://www.gpscontrolec.com",
+        "https://api.gpscontrolec.com",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:3001",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -41,6 +36,7 @@ app.add_middleware(
 )
 
 register_admin_routes(app, lambda: ADMIN_PASSWORD)
+register_plan_routes(app, _require_admin)
 
 
 @app.on_event("startup")
@@ -59,32 +55,15 @@ def fleet():
     vehicles_raw = get_all_vehicles()
     alerts_raw = get_alerts(limit=10)
     metrics = get_metrics()
-
-    vehicles = [
-        {
-            "id": item["id"],
-            "name": item["name"],
-            "status": item["status"],
-            "lat": item["lat"],
-            "lng": item["lng"],
-            "speed": item["speed"],
-            "geofence": item["geofence"],
-            "updatedAt": item["updated_at"],
-        }
-        for item in vehicles_raw
-    ]
-
-    alerts = [
-        {
-            "id": item["id"],
-            "type": item["type"],
-            "message": item["message"],
-            "createdAt": item["created_at"],
-            "severity": item["severity"],
-        }
-        for item in alerts_raw
-    ]
-
+    vehicles = [{
+        "id": item["id"], "name": item["name"], "status": item["status"],
+        "lat": item["lat"], "lng": item["lng"], "speed": item["speed"],
+        "geofence": item["geofence"], "updatedAt": item["updated_at"],
+    } for item in vehicles_raw]
+    alerts = [{
+        "id": item["id"], "type": item["type"], "message": item["message"],
+        "createdAt": item["created_at"], "severity": item["severity"],
+    } for item in alerts_raw]
     return {"vehicles": vehicles, "alerts": alerts, "metrics": metrics}
 
 
@@ -153,28 +132,20 @@ def create_alert_endpoint(payload: AlertCreate):
 def simulate_tick():
     vehicles = get_all_vehicles()
     moved = []
-
     for vehicle in vehicles:
         if vehicle["status"] == "offline":
             continue
-
         lat = random_shift(vehicle["lat"], 0.003 if vehicle["status"] == "active" else 0.0008)
         lng = random_shift(vehicle["lng"], 0.003 if vehicle["status"] == "active" else 0.0008)
         speed = vehicle["speed"] if vehicle["status"] == "active" else 0
-
         updated = add_position(vehicle["id"], lat, lng, speed, vehicle.get("geofence"))
-
         if updated:
             moved.append(updated["id"])
-
     if moved:
-        create_alert(
-            {
-                "id": f"sim-{now_iso()}",
-                "type": "movement",
-                "message": f"Movimiento detectado en {choice(moved)}",
-                "severity": "medium",
-            }
-        )
-
+        create_alert({
+            "id": f"sim-{now_iso()}",
+            "type": "movement",
+            "message": f"Movimiento detectado en {choice(moved)}",
+            "severity": "medium",
+        })
     return {"ok": True, "moved": moved}
