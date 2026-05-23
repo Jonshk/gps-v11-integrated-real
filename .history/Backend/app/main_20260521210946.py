@@ -17,9 +17,8 @@ from app.security import require_write_key
 from app.utils import now_iso, random_shift
 from app.admin_routes import register_admin_routes, _require_admin
 from app.plans_routes import register_plan_routes
-from app.gateway_routes import register_gateway_routes, init_gateway_table
 
-app = FastAPI(title=APP_NAME, version="2.3.0")
+app = FastAPI(title=APP_NAME, version="2.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,13 +37,11 @@ app.add_middleware(
 
 register_admin_routes(app, lambda: ADMIN_PASSWORD)
 register_plan_routes(app, _require_admin)
-register_gateway_routes(app, _require_admin)
 
 
 @app.on_event("startup")
 def startup() -> None:
     init_db()
-    init_gateway_table()
     seed_if_empty()
 
 
@@ -74,18 +71,21 @@ def fleet():
 def list_vehicles():
     return get_all_vehicles()
 
+
 @app.get("/vehicles/{vehicle_id}")
 def read_vehicle(vehicle_id: str):
-    v = get_vehicle(vehicle_id)
-    if not v:
+    vehicle = get_vehicle(vehicle_id)
+    if not vehicle:
         raise HTTPException(status_code=404, detail="Vehicle not found")
-    return v
+    return vehicle
+
 
 @app.post("/vehicles", dependencies=[Depends(require_write_key)])
 def create_vehicle_endpoint(payload: VehicleCreate):
     if get_vehicle(payload.id):
         raise HTTPException(status_code=409, detail="Vehicle already exists")
     return create_vehicle(payload.model_dump())
+
 
 @app.patch("/vehicles/{vehicle_id}", dependencies=[Depends(require_write_key)])
 def update_vehicle_endpoint(vehicle_id: str, payload: VehicleUpdate):
@@ -94,11 +94,14 @@ def update_vehicle_endpoint(vehicle_id: str, payload: VehicleUpdate):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return updated
 
+
 @app.delete("/vehicles/{vehicle_id}", dependencies=[Depends(require_write_key)])
 def delete_vehicle_endpoint(vehicle_id: str):
-    if not delete_vehicle(vehicle_id):
+    ok = delete_vehicle(vehicle_id)
+    if not ok:
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return {"ok": True}
+
 
 @app.post("/vehicles/{vehicle_id}/position", dependencies=[Depends(require_write_key)])
 def add_position_endpoint(vehicle_id: str, payload: PositionCreate):
@@ -107,19 +110,23 @@ def add_position_endpoint(vehicle_id: str, payload: PositionCreate):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return updated
 
+
 @app.get("/vehicles/{vehicle_id}/positions")
 def list_positions(vehicle_id: str, limit: int = Query(default=20, ge=1, le=500)):
     if not get_vehicle(vehicle_id):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return get_positions(vehicle_id, limit=limit)
 
+
 @app.get("/alerts")
 def list_alerts(limit: int = Query(default=20, ge=1, le=200)):
     return get_alerts(limit=limit)
 
+
 @app.post("/alerts", dependencies=[Depends(require_write_key)])
 def create_alert_endpoint(payload: AlertCreate):
     return create_alert(payload.model_dump())
+
 
 @app.post("/simulate/tick", dependencies=[Depends(require_write_key)])
 def simulate_tick():
