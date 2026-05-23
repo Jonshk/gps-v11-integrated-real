@@ -1,0 +1,18 @@
+{
+    "sourceFile": "Backend/app/config.py",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1779542761604,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1779542761604,
+            "name": "Commit-0",
+            "content": "import os\r\nfrom dotenv import load_dotenv\r\n\r\nload_dotenv()\r\n\r\nAPP_NAME        = os.getenv(\"APP_NAME\", \"GPS Backend EC\")\r\nAPI_WRITE_KEY   = os.getenv(\"API_WRITE_KEY\", \"changeme123\")\r\nADMIN_PASSWORD  = os.getenv(\"ADMIN_PASSWORD\", \"admin123\")\r\nDB_FILE         = os.getenv(\"DB_FILE\", \"data.db\")\r\nGPS_PASSWORD    = os.getenv(\"GPS_PASSWORD\", \"123456\")\r\nCORS_ORIGINS    = [\r\n    item.strip()\r\n    for item in os.getenv(\r\n        \"CORS_ORIGINS\",\r\n        \"http://localhost:3000,http://127.0.0.1:3000,https://gpscontrolec.com,https://www.gpscontrolec.com\"\r\n    ).split(\",\")\r\n    if item.strip()\r\n]"
+        }
+    ]
+}
