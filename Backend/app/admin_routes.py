@@ -261,11 +261,7 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
             except Exception:
                 logs = []
 
-        return {
-            "ok": True,
-            "logs": logs,
-            "total": len(logs),
-        }
+        return logs
 
     @app.post("/app/login")
     def app_login(payload: AppLoginRequest):
