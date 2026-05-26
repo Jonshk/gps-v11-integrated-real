@@ -1,319 +1,401 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { adminApi, AppClient } from "@/lib/adminApi";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://gps-backend-ec.onrender.com";
-
-function getToken() {
-  return typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
-}
+const getToken = () => typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
+const H = () => ({ "Content-Type": "application/json", "x-admin-token": getToken() || "" });
 
 async function sendCommand(clientId: string, command: string) {
-  const res = await fetch(`${BASE}/admin/sms/send`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-admin-token": getToken() || "",
-    },
+  const res = await fetch(`${BASE}/admin/gateway/send`, {
+    method: "POST", headers: H(),
     body: JSON.stringify({ client_id: clientId, command }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || "Error al enviar comando");
+  if (!res.ok) throw new Error(data.detail || "Error");
   return data;
 }
 
-const COMMANDS = [
-  { id: "locate",       label: "Localizar",         icon: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z", color: "#00d4a0" },
-  { id: "stop_engine",  label: "Apagar motor",       icon: "M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z", color: "#e8232a" },
-  { id: "start_engine", label: "Encender motor",     icon: "M8 5v14l11-7z", color: "#00d4a0" },
-  { id: "move_alert",   label: "Alerta movimiento",  icon: "M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z", color: "#fbbf24" },
-  { id: "speed_alert",  label: "Alerta velocidad",   icon: "M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.27-10.44zm-9.79 6.84a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z", color: "#fb923c" },
-  { id: "online",       label: "Modo activo",        icon: "M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z", color: "#60a5fa" },
-  { id: "monitor",      label: "Micrófono espía",    icon: "M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z", color: "#a78bfa" },
+const ICONS: Record<string, string> = {
+  locate:       "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+  live_track:   "M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06z",
+  stop_track:   "M6 6h12v12H6z",
+  stop_engine:  "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z",
+  start_engine: "M8 5v14l11-7z",
+  move_alert:   "M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z",
+  speed_alert:  "M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.27-10.44z",
+  no_speed:     "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11H7v-2h10v2z",
+  monitor:      "M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1 1.93c-3.94-.49-7-3.85-7-7.93h2c0 3.31 2.69 6 6 6s6-2.69 6-6h2c0 4.08-3.06 7.44-7 7.93V21h-2v-3.07z",
+  status:       "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z",
+  battery:      "M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z",
+  reset:        "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z",
+};
+
+type CmdDef = { key: string; label: string; sub: string; color: string; anim: string };
+
+const COMMAND_GRID: CmdDef[][] = [
+  [
+    { key:"locate",       label:"Localizar",      sub:"check",        color:"#e8232a", anim:"float" },
+    { key:"live_track",   label:"Live Tracking",  sub:"fix030s999n",  color:"#e8232a", anim:"spin"  },
+    { key:"stop_track",   label:"Parar tracking", sub:"nofix",        color:"#6b7280", anim:"pulse" },
+    { key:"stop_engine",  label:"Apagar motor",   sub:"stopelec",     color:"#e8232a", anim:"shake" },
+    { key:"start_engine", label:"Encender motor", sub:"supplyelec",   color:"#16a34a", anim:"pulse" },
+    { key:"move_alert",   label:"Alerta mov.",    sub:"move",         color:"#d97706", anim:"shake" },
+  ],
+  [
+    { key:"speed_alert",  label:"Speed alarm",    sub:"speed 080",    color:"#d97706", anim:"float" },
+    { key:"no_speed",     label:"Sin vel.",       sub:"nospeed",      color:"#6b7280", anim:"pulse" },
+    { key:"monitor",      label:"Micrófono",      sub:"monitor+call", color:"#7c3aed", anim:"pulse" },
+    { key:"status",       label:"Estado GPS",     sub:"status",       color:"#2563eb", anim:"float" },
+    { key:"battery",      label:"Batería",        sub:"battery",      color:"#16a34a", anim:"pulse" },
+    { key:"reset",        label:"Reiniciar",      sub:"reset",        color:"#ea580c", anim:"spin"  },
+  ],
 ];
 
-type CmdResult = { clientId: string; command: string; ok: boolean; message: string; };
+type Msg = { id:number; body:string; received_at:string; label:string; icon:string; lat:number|null; lng:number|null; };
+type Pos = { lat:number; lng:number; speed:number|null; battery:number|null; recorded_at:string; };
+type StatusAlert = { type:"pending"|"sent"|"failed"|"timeout"|"no_response"; label:string; detail:string; };
+
+const STATUS_COLORS: Record<string, string> = {
+  pending:"#d97706", sent:"#16a34a", failed:"#e8232a", timeout:"#e8232a", no_response:"#ea580c",
+};
+const STATUS_ICONS: Record<string, string> = {
+  pending:"⏳", sent:"✓", failed:"✗", timeout:"⚠", no_response:"⚠",
+};
+
+function GlassCmd({ cmd, onSend, disabled }: { cmd: CmdDef; onSend: ()=>void; disabled: boolean }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button disabled={disabled} onClick={onSend}
+      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{
+        position:"relative", padding:"18px 14px 14px",
+        background: hov ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.7)",
+        border:`1px solid ${hov ? "rgba(0,0,0,0.12)" : "rgba(0,0,0,0.07)"}`,
+        borderRadius:14, backdropFilter:"blur(20px)",
+        cursor: disabled ? "not-allowed" : "pointer",
+        textAlign:"left", width:"100%",
+        transition:"all 0.2s cubic-bezier(0.32,0.72,0,1)",
+        transform: hov && !disabled ? "translateY(-2px)" : "translateY(0)",
+        boxShadow: hov ? "0 8px 24px rgba(0,0,0,0.1)" : "0 2px 8px rgba(0,0,0,0.06)",
+        opacity: disabled ? 0.5 : 1, overflow:"hidden",
+      }}>
+      <div style={{ position:"absolute", top:0, left:0, right:0, height:2,
+        background: hov ? `linear-gradient(90deg,${cmd.color},transparent)` : "transparent",
+        transition:"all 0.3s", borderRadius:"14px 14px 0 0" }}/>
+      <div style={{ marginBottom:10 }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill={hov ? cmd.color : "#9ca3af"}
+          style={{
+            transition:"all 0.2s",
+            filter: hov ? `drop-shadow(0 0 4px ${cmd.color}60)` : "none",
+            animation: hov
+              ? cmd.anim==="spin"  ? "icSpin 1.2s linear infinite"
+              : cmd.anim==="float" ? "icFloat 1.5s ease-in-out infinite"
+              : cmd.anim==="shake" ? "icShake 0.4s ease-in-out infinite"
+              : "icPulse 1s ease-in-out infinite" : "none",
+          }}>
+          <path d={ICONS[cmd.key]}/>
+        </svg>
+      </div>
+      <div style={{ fontSize:13, fontWeight:700, color: hov ? "#1a1a2e" : "#374151",
+        marginBottom:3, transition:"color 0.2s" }}>{cmd.label}</div>
+      <div style={{ fontSize:9, color: hov ? "#9ca3af" : "#d1d5db",
+        fontFamily:"monospace" }}>{cmd.sub}</div>
+    </button>
+  );
+}
 
 export default function ComandosPage() {
-  const [clients, setClients]   = useState<AppClient[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [sending, setSending]   = useState<string | null>(null); // "clientId:command"
-  const [results, setResults]   = useState<CmdResult[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [clients, setClients]         = useState<AppClient[]>([]);
+  const [selected, setSelected]       = useState<string|null>(null);
+  const [loading, setLoading]         = useState(true);
+  const [search, setSearch]           = useState("");
+  const [sending, setSending]         = useState<string|null>(null);
+  const [messages, setMessages]       = useState<Msg[]>([]);
+  const [position, setPosition]       = useState<Pos|null>(null);
+  const [statusAlert, setStatusAlert] = useState<StatusAlert|null>(null);
+  const pollRef = useRef<NodeJS.Timeout|null>(null);
+
+  const withGps = useMemo(() => clients.filter(c => c.sim_number), [clients]);
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return !q ? withGps : withGps.filter(c =>
+      c.client_name.toLowerCase().includes(q) ||
+      (c.vehicle_name||"").toLowerCase().includes(q) ||
+      (c.sim_number||"").includes(q)
+    );
+  }, [withGps, search]);
+
+  const sel = withGps.find(c => c.id === selected) ?? withGps[0];
+
+  useEffect(() => { adminApi.getClients().then(c => { setClients(c); setLoading(false); }); }, []);
+
+  const loadData = useCallback(async () => {
+    if (!sel) return;
+    try {
+      const [msgs, pos] = await Promise.all([
+        fetch(`${BASE}/admin/gps-messages?limit=10`, { headers:H() }).then(r=>r.ok?r.json():[]),
+        fetch(`${BASE}/admin/live/${sel.id}`, { headers:H() }).then(r=>r.ok?r.json():null),
+      ]);
+      setMessages(msgs||[]);
+      if (pos?.ok) setPosition(pos);
+    } catch(_) {}
+  }, [sel?.id]);
 
   useEffect(() => {
-    adminApi.getClients().then(c => {
-      setClients(c.filter(cl => cl.sim_number));
-      setLoading(false);
-    });
-  }, []);
+    if (!sel) return;
+    loadData();
+    pollRef.current = setInterval(loadData, 5000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [sel?.id, loadData]);
 
-  async function handleSend(clientId: string, command: string) {
-    const key = `${clientId}:${command}`;
+  async function handleCmd(key: string) {
+    if (!sel || sending) return;
     setSending(key);
+    setStatusAlert({ type:"pending", label:"Enviando comando...", detail:"Esperando que el Gateway recoja el SMS" });
     try {
-      const res = await sendCommand(clientId, command);
-      setResults(prev => [{
-        clientId, command, ok: true,
-        message: res.message || "Comando enviado",
-      }, ...prev.slice(0, 19)]);
-    } catch (e: unknown) {
-      setResults(prev => [{
-        clientId, command, ok: false,
-        message: e instanceof Error ? e.message : "Error",
-      }, ...prev.slice(0, 19)]);
-    } finally {
-      setSending(null);
-    }
+      await sendCommand(sel.id, key);
+      setStatusAlert({ type:"sent", label:"Comando enviado al Gateway", detail:"El GPS responderá en breve..." });
+      setTimeout(() => {
+        setStatusAlert(prev => prev?.type==="sent"
+          ? { type:"no_response", label:"Sin respuesta del GPS", detail:"Sin señal GSM, GPS apagado o batería baja" }
+          : prev);
+      }, 90000);
+    } catch(e: unknown) {
+      setStatusAlert({ type:"failed", label:"Error", detail: e instanceof Error ? e.message : "Error desconocido" });
+    } finally { setSending(null); }
   }
 
-  const clientsWithGps = clients.filter(c => c.sim_number);
-  const selectedClient = clientsWithGps.find(c => c.id === selected) || clientsWithGps[0];
-
   return (
-    <div style={{ padding: "32px 36px", color: "#f0f6ff", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.8 }}>Comandos SMS</h1>
-        <p style={{ color: "rgba(200,218,238,0.45)", fontSize: 13, marginTop: 4 }}>
-          Envía comandos directamente al GPS del cliente via Twilio — sin depender del teléfono del cliente.
-        </p>
-      </div>
+    <div style={{ display:"flex", height:"100vh", overflow:"hidden", background:"#f0f2f5",
+      color:"#1a1a2e", fontFamily:"'Plus Jakarta Sans',system-ui,sans-serif" }}>
 
-      {/* Alerta emergencia */}
-      <div style={{
-        marginBottom: 24, padding: "14px 18px",
-        background: "rgba(232,35,42,0.06)",
-        border: "1px solid rgba(232,35,42,0.2)",
-        borderRadius: 12, fontSize: 13,
-        color: "rgba(200,218,238,0.7)", lineHeight: 1.6,
-        display: "flex", gap: 12, alignItems: "flex-start",
-      }}>
-        <span style={{ fontSize: "1.3rem" }}>🚨</span>
-        <div>
-          <strong style={{ color: "#e8232a" }}>Emergencia:</strong> Si un cliente reporta robo del vehículo
-          y no tiene acceso a su app, selecciona el cliente aquí y envía el comando
-          <strong> "Apagar motor"</strong> para inmovilizar el vehículo remotamente.
+      {/* SIDEBAR */}
+      <aside style={{ width:260, borderRight:"1px solid rgba(0,0,0,0.06)",
+        display:"flex", flexDirection:"column", height:"100vh",
+        background:"rgba(255,255,255,0.85)", backdropFilter:"blur(20px)",
+        flexShrink:0, boxShadow:"2px 0 12px rgba(0,0,0,0.04)" }}>
+        <div style={{ padding:"22px 18px 14px", borderBottom:"1px solid rgba(0,0,0,0.06)" }}>
+          <p style={{ fontSize:9, fontWeight:800, letterSpacing:"0.2em", color:"#e8232a",
+            textTransform:"uppercase", margin:"0 0 4px" }}>GPS Control EC</p>
+          <h2 style={{ fontSize:18, fontWeight:800, color:"#1a1a2e", letterSpacing:"-0.5px", margin:0 }}>Panel GPS</h2>
         </div>
-      </div>
+        <div style={{ padding:"12px 12px 6px" }}>
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="Buscar cliente, SIM..."
+            style={{ width:"100%", padding:"9px 12px", background:"rgba(0,0,0,0.03)",
+              border:"1px solid rgba(0,0,0,0.08)", borderRadius:10, color:"#374151",
+              fontSize:12, outline:"none", boxSizing:"border-box" }}/>
+          <p style={{ fontSize:10, color:"#9ca3af", margin:"6px 2px 0", fontWeight:600 }}>
+            {withGps.length} dispositivos GPS{search ? ` · ${filtered.length} resultados` : ""}
+          </p>
+        </div>
+        <div style={{ flex:1, overflowY:"auto", padding:"4px 10px 16px" }}>
+          {loading ? [1,2,3].map(i=>(
+            <div key={i} style={{ height:52, borderRadius:10, background:"rgba(0,0,0,0.04)",
+              marginBottom:4, animation:"shimmer 1.5s infinite" }}/>
+          )) : filtered.map(c => {
+            const active = c.id === (selected ?? withGps[0]?.id);
+            return (
+              <button key={c.id} onClick={()=>setSelected(c.id)} style={{
+                width:"100%", padding:"10px 12px", marginBottom:3,
+                background: active ? "rgba(232,35,42,0.06)" : "transparent",
+                border:`1px solid ${active ? "rgba(232,35,42,0.2)" : "transparent"}`,
+                borderLeft:`3px solid ${active ? "#e8232a" : "transparent"}`,
+                borderRadius:10, cursor:"pointer", textAlign:"left", transition:"all 0.15s",
+              }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <div style={{ width:32, height:32, borderRadius:8,
+                    background: active ? "rgba(232,35,42,0.08)" : "rgba(0,0,0,0.04)",
+                    display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill={active ? "#e8232a" : "#9ca3af"}>
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color: active ? "#1a1a2e" : "#6b7280",
+                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.client_name}</div>
+                    <div style={{ fontSize:10, color:"#9ca3af", marginTop:1,
+                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.vehicle_name||"—"}</div>
+                  </div>
+                  {active && <div style={{ width:6, height:6, borderRadius:"50%", background:"#e8232a",
+                    boxShadow:"0 0 8px rgba(232,35,42,0.5)", animation:"liveDot 2s infinite", flexShrink:0 }}/>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </aside>
 
-      <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 20 }}>
+      {/* MAIN */}
+      {sel ? (
+        <div style={{ flex:1, display:"flex", flexDirection:"column", height:"100vh", overflow:"hidden" }}>
 
-        {/* Lista de clientes */}
-        <div style={{
-          background: "#0f1f36",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 16, overflow: "hidden",
-        }}>
-          <div style={{
-            padding: "14px 16px",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
-            fontSize: 11, fontWeight: 700,
-            color: "rgba(200,218,238,0.35)", letterSpacing: 1,
-            textTransform: "uppercase",
-          }}>
-            Clientes con GPS ({clientsWithGps.length})
+          {/* Top bar */}
+          <div style={{ padding:"14px 24px", borderBottom:"1px solid rgba(0,0,0,0.06)",
+            display:"flex", alignItems:"center", gap:16,
+            background:"rgba(255,255,255,0.85)", backdropFilter:"blur(20px)", flexShrink:0 }}>
+            <div style={{ flex:1 }}>
+              <h3 style={{ margin:0, fontSize:16, fontWeight:800, color:"#1a1a2e" }}>{sel.client_name}</h3>
+              <p style={{ margin:"2px 0 0", fontSize:11, color:"#9ca3af" }}>
+                {sel.vehicle_name} · @{sel.username} · <span style={{ fontFamily:"monospace" }}>{sel.sim_number}</span>
+              </p>
+            </div>
+            {position && (
+              <div style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 12px",
+                background:"rgba(34,197,94,0.08)", border:"1px solid rgba(34,197,94,0.2)", borderRadius:8 }}>
+                <div style={{ width:6, height:6, borderRadius:"50%", background:"#22c55e", animation:"liveDot 2s infinite" }}/>
+                <span style={{ fontSize:11, color:"#16a34a", fontWeight:600 }}>
+                  {position.speed !== null ? `${Math.round(position.speed!)} km/h` : "En vivo"}
+                  {position.battery !== null ? ` · 🔋${position.battery}%` : ""}
+                </span>
+              </div>
+            )}
           </div>
 
-          {loading ? (
-            <div style={{ padding: 24, textAlign: "center",
-                color: "rgba(200,218,238,0.3)", fontSize: 13 }}>
-              Cargando...
-            </div>
-          ) : clientsWithGps.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center",
-                color: "rgba(200,218,238,0.3)", fontSize: 13 }}>
-              Sin clientes con GPS asignado
-            </div>
-          ) : clientsWithGps.map(c => (
-            <div
-              key={c.id}
-              onClick={() => setSelected(c.id)}
-              style={{
-                padding: "14px 16px", cursor: "pointer",
-                background: (selected === c.id || (!selected && c.id === clientsWithGps[0]?.id))
-                  ? "rgba(232,35,42,0.08)" : "transparent",
-                borderLeft: `3px solid ${(selected === c.id || (!selected && c.id === clientsWithGps[0]?.id))
-                  ? "#e8232a" : "transparent"}`,
-                borderBottom: "1px solid rgba(255,255,255,0.04)",
-                transition: "all 0.15s",
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{c.client_name}</div>
-              <div style={{ color: "rgba(200,218,238,0.4)", fontSize: 11, marginTop: 3 }}>
-                {c.vehicle_name || "Sin vehículo"}
+          {/* Status alert */}
+          {statusAlert && (
+            <div style={{ margin:"10px 24px 0", padding:"10px 16px",
+              background:`${STATUS_COLORS[statusAlert.type]}0d`,
+              border:`1px solid ${STATUS_COLORS[statusAlert.type]}30`,
+              borderRadius:10, display:"flex", alignItems:"center", gap:12, flexShrink:0 }}>
+              <span style={{ fontSize:16, color:STATUS_COLORS[statusAlert.type] }}>{STATUS_ICONS[statusAlert.type]}</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:STATUS_COLORS[statusAlert.type] }}>{statusAlert.label}</div>
+                <div style={{ fontSize:11, color:"#6b7280", marginTop:1 }}>{statusAlert.detail}</div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Panel de comandos */}
-        <div>
-          {selectedClient ? (
-            <>
-              {/* Header del cliente seleccionado */}
-              <div style={{
-                background: "#0f1f36",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 14, padding: "16px 20px",
-                marginBottom: 16,
-                display: "flex", alignItems: "center", gap: 16,
-              }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: 12,
-                  background: "rgba(0,212,160,0.1)",
-                  display: "grid", placeItems: "center",
-                }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                    stroke="#00d4a0" strokeWidth="1.8">
-                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z"/>
-                  </svg>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 16 }}>{selectedClient.client_name}</div>
-                  <div style={{ color: "rgba(200,218,238,0.4)", fontSize: 12, marginTop: 2 }}>
-                    {selectedClient.vehicle_name} · @{selectedClient.username}
-                  </div>
-                </div>
-                {/* SIM visible solo para admin */}
-                <div style={{
-                  padding: "6px 12px",
-                  background: "rgba(0,212,160,0.08)",
-                  border: "1px solid rgba(0,212,160,0.2)",
-                  borderRadius: 8, fontSize: 12,
-                  fontFamily: "monospace", color: "#00d4a0",
-                }}>
-                  📡 SIM: {selectedClient.sim_number}
-                </div>
-              </div>
-
-              {/* Grid de comandos */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: 10, marginBottom: 20,
-              }}>
-                {COMMANDS.map(cmd => {
-                  const key = `${selectedClient.id}:${cmd.id}`;
-                  const isSending = sending === key;
-                  return (
-                    <button
-                      key={cmd.id}
-                      disabled={isSending || sending !== null}
-                      onClick={() => handleSend(selectedClient.id, cmd.id)}
-                      style={{
-                        padding: "18px 14px",
-                        background: `${cmd.color}10`,
-                        border: `1px solid ${cmd.color}25`,
-                        borderRadius: 14, cursor: isSending ? "not-allowed" : "pointer",
-                        display: "flex", flexDirection: "column",
-                        alignItems: "center", gap: 10,
-                        transition: "all 0.15s",
-                        opacity: sending && !isSending ? 0.5 : 1,
-                      }}
-                    >
-                      {isSending ? (
-                        <div style={{
-                          width: 24, height: 24, border: `2px solid ${cmd.color}`,
-                          borderTopColor: "transparent",
-                          borderRadius: "50%",
-                          animation: "spin 0.8s linear infinite",
-                        }}/>
-                      ) : (
-                        <svg width="24" height="24" viewBox="0 0 24 24"
-                          fill={cmd.color}>
-                          <path d={cmd.icon}/>
-                        </svg>
-                      )}
-                      <span style={{
-                        color: cmd.color, fontSize: 12,
-                        fontWeight: 600, textAlign: "center",
-                      }}>
-                        {cmd.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Log de comandos enviados */}
-              {results.length > 0 && (
-                <div style={{
-                  background: "#0f1f36",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 14, overflow: "hidden",
-                }}>
-                  <div style={{
-                    padding: "12px 16px",
-                    borderBottom: "1px solid rgba(255,255,255,0.06)",
-                    fontSize: 11, fontWeight: 700,
-                    color: "rgba(200,218,238,0.35)", letterSpacing: 1,
-                    textTransform: "uppercase",
-                    display: "flex", justifyContent: "space-between",
-                    alignItems: "center",
-                  }}>
-                    <span>Historial de comandos</span>
-                    <button
-                      onClick={() => setResults([])}
-                      style={{ background: "none", border: "none",
-                        color: "rgba(200,218,238,0.3)", cursor: "pointer",
-                        fontSize: 11 }}
-                    >
-                      Limpiar
-                    </button>
-                  </div>
-                  {results.map((r, i) => {
-                    const cmd = COMMANDS.find(c => c.id === r.command);
-                    const cli = clientsWithGps.find(c => c.id === r.clientId);
-                    return (
-                      <div key={i} style={{
-                        padding: "12px 16px",
-                        borderBottom: "1px solid rgba(255,255,255,0.04)",
-                        display: "flex", alignItems: "center", gap: 12,
-                      }}>
-                        <div style={{
-                          width: 8, height: 8, borderRadius: "50%",
-                          background: r.ok ? "#00d4a0" : "#e8232a",
-                          flexShrink: 0,
-                        }}/>
-                        <div style={{ flex: 1 }}>
-                          <span style={{ fontWeight: 600, fontSize: 13 }}>
-                            {cmd?.label || r.command}
-                          </span>
-                          <span style={{ color: "rgba(200,218,238,0.4)",
-                              fontSize: 12, marginLeft: 8 }}>
-                            → {cli?.client_name || r.clientId}
-                          </span>
-                        </div>
-                        <span style={{
-                          fontSize: 12,
-                          color: r.ok ? "#00d4a0" : "#e8232a",
-                        }}>
-                          {r.ok ? "✓ Enviado" : "✗ Error"}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          ) : (
-            <div style={{
-              background: "#0f1f36",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 14, padding: 48,
-              textAlign: "center",
-              color: "rgba(200,218,238,0.3)", fontSize: 14,
-            }}>
-              Selecciona un cliente para enviar comandos
+              <button onClick={()=>setStatusAlert(null)} style={{ background:"none", border:"none",
+                color:"#9ca3af", cursor:"pointer", fontSize:18, lineHeight:1 }}>×</button>
             </div>
           )}
+
+          {/* Grid mapa + comandos + respuestas */}
+          <div style={{ flex:1, display:"grid", gridTemplateColumns:"1fr 300px",
+            gridTemplateRows:"1fr 1fr", overflow:"hidden", padding:"14px 24px 0", gap:"12px" }}>
+
+            {/* Mapa */}
+            <div style={{ gridRow:"1 / 3", background:"rgba(255,255,255,0.7)",
+              border:"1px solid rgba(0,0,0,0.07)", borderRadius:16, overflow:"hidden",
+              boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
+              {position ? (
+                <iframe key={`${position.lat}-${position.lng}`}
+                  src={`https://maps.google.com/maps?q=${position.lat},${position.lng}&z=15&output=embed`}
+                  width="100%" height="100%" style={{ border:"none", display:"block" }} title="GPS"/>
+              ) : (
+                <div style={{ height:"100%", display:"flex", flexDirection:"column",
+                  alignItems:"center", justifyContent:"center", gap:12 }}>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="#d1d5db"
+                    style={{ animation:"icFloat 3s ease-in-out infinite" }}>
+                    <path d={ICONS.locate}/>
+                  </svg>
+                  <div style={{ textAlign:"center" }}>
+                    <div style={{ fontSize:14, fontWeight:600, color:"#9ca3af" }}>Sin posición</div>
+                    <div style={{ fontSize:11, color:"#d1d5db", marginTop:4 }}>Envía "Localizar" para obtener coordenadas</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Comandos fila 1 */}
+            <div style={{ background:"rgba(255,255,255,0.7)", border:"1px solid rgba(0,0,0,0.07)",
+              borderRadius:16, padding:"14px 14px 10px", overflow:"hidden",
+              boxShadow:"0 2px 12px rgba(0,0,0,0.04)" }}>
+              <p style={{ fontSize:9, fontWeight:800, letterSpacing:"0.18em", color:"#e8232a",
+                textTransform:"uppercase", margin:"0 0 10px" }}>Comandos</p>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:7 }}>
+                {COMMAND_GRID[0].map(cmd => (
+                  <GlassCmd key={cmd.key} cmd={cmd} disabled={!!sending} onSend={()=>handleCmd(cmd.key)}/>
+                ))}
+              </div>
+            </div>
+
+            {/* Respuestas GPS fila 2 */}
+            <div style={{ background:"rgba(255,255,255,0.7)", border:"1px solid rgba(0,0,0,0.07)",
+              borderRadius:16, display:"flex", flexDirection:"column", overflow:"hidden",
+              boxShadow:"0 2px 12px rgba(0,0,0,0.04)" }}>
+              <div style={{ padding:"12px 14px 8px", borderBottom:"1px solid rgba(0,0,0,0.05)",
+                display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
+                <p style={{ fontSize:9, fontWeight:800, letterSpacing:"0.18em",
+                  color:"#9ca3af", textTransform:"uppercase", margin:0 }}>Respuestas GPS · cada 5s</p>
+                <button onClick={async()=>{
+                  await fetch(`${BASE}/admin/gps-messages`,{method:"DELETE",headers:H()});
+                  setMessages([]);
+                }} style={{ background:"none", border:"none", color:"#9ca3af", cursor:"pointer", fontSize:11 }}>
+                  Limpiar
+                </button>
+              </div>
+              <div style={{ flex:1, overflowY:"auto" }}>
+                {messages.length === 0 ? (
+                  <div style={{ height:"100%", display:"flex", alignItems:"center",
+                    justifyContent:"center", padding:16 }}>
+                    <div style={{ fontSize:11, color:"#d1d5db", textAlign:"center" }}>
+                      Esperando respuestas del GPS...
+                    </div>
+                  </div>
+                ) : messages.map(msg => (
+                  <div key={msg.id} style={{ padding:"9px 14px", borderBottom:"1px solid rgba(0,0,0,0.04)" }}>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <span style={{ fontSize:13, flexShrink:0 }}>{msg.icon||"💬"}</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
+                          <span style={{ fontSize:11, fontWeight:700, color:"#374151" }}>{msg.label}</span>
+                          <span style={{ fontSize:9, color:"#9ca3af", fontFamily:"monospace" }}>
+                            {new Date(msg.received_at).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:9, color:"#6b7280", fontFamily:"monospace",
+                          wordBreak:"break-all", lineHeight:1.5 }}>{msg.body}</div>
+                        {msg.lat && msg.lng && (
+                          <a href={`https://maps.google.com/maps?q=${msg.lat},${msg.lng}`}
+                            target="_blank" rel="noreferrer"
+                            style={{ display:"inline-flex", gap:4, marginTop:4, padding:"3px 8px",
+                              borderRadius:5, background:"rgba(232,35,42,0.06)",
+                              border:"1px solid rgba(232,35,42,0.15)",
+                              color:"#e8232a", fontSize:9, fontWeight:700, textDecoration:"none" }}>
+                            📍 {msg.lat.toFixed(4)}, {msg.lng.toFixed(4)}
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom commands */}
+          <div style={{ padding:"12px 24px 16px", flexShrink:0 }}>
+            <div style={{ background:"rgba(255,255,255,0.7)", border:"1px solid rgba(0,0,0,0.07)",
+              borderRadius:16, padding:"12px 14px", boxShadow:"0 2px 12px rgba(0,0,0,0.04)" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:7 }}>
+                {COMMAND_GRID[1].map(cmd => (
+                  <GlassCmd key={cmd.key} cmd={cmd} disabled={!!sending} onSend={()=>handleCmd(cmd.key)}/>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div style={{ flex:1, display:"flex", alignItems:"center",
+          justifyContent:"center", flexDirection:"column", gap:14 }}>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="#d1d5db"
+            style={{ animation:"icFloat 3s ease-in-out infinite" }}>
+            <path d={ICONS.locate}/>
+          </svg>
+          <div style={{ fontSize:14, color:"#9ca3af", fontWeight:600 }}>Selecciona un cliente</div>
+        </div>
+      )}
 
       <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
+        @keyframes icSpin  { to{transform:rotate(360deg)} }
+        @keyframes icFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+        @keyframes icShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
+        @keyframes icPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
+        @keyframes liveDot { 0%,100%{opacity:1} 50%{opacity:.3} }
+        @keyframes shimmer { 0%,100%{opacity:.4} 50%{opacity:.8} }
+        ::-webkit-scrollbar{width:3px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.1);border-radius:2px}
       `}</style>
     </div>
   );
