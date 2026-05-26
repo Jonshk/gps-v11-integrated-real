@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import secrets as _secrets
-from fastapi import Depends, FastAPI, HTTPException, Header
+from fastapi import Depends, FastAPI, HTTPException, Header, Query
 from pydantic import BaseModel
 from typing import Optional
 
@@ -94,8 +94,6 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
             _admin_sessions.discard(x_admin_token)
         return {"ok": True}
 
-    # ── GPS Devices ───────────────────────────────────────────────────────
-
     @app.get("/admin/devices", dependencies=[Depends(_require_admin)])
     def list_devices():
         from app.admin_repository import get_all_devices
@@ -133,8 +131,6 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
         if not delete_device(device_id):
             raise HTTPException(status_code=404, detail="Dispositivo no encontrado.")
         return {"ok": True}
-
-    # ── Clients ───────────────────────────────────────────────────────────
 
     @app.get("/admin/clients", dependencies=[Depends(_require_admin)])
     def list_clients():
@@ -187,21 +183,23 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
             raise HTTPException(status_code=404, detail="Cliente no encontrado.")
         return cli
 
-    # ── SMS ───────────────────────────────────────────────────────────────
-
     @app.post("/admin/sms/send", dependencies=[Depends(_require_admin)])
     def send_sms_command(payload: SmsCommandRequest):
         from app.admin_repository import get_client, get_device
         from app.sms_service import send_gps_command
+
         cli = get_client(payload.client_id)
         if not cli:
             raise HTTPException(status_code=404, detail="Cliente no encontrado.")
+
         sim_number = cli.get("sim_number")
         if not sim_number and cli.get("gps_device_id"):
             dev = get_device(cli["gps_device_id"])
             sim_number = dev.get("sim_number") if dev else None
+
         if not sim_number:
             raise HTTPException(status_code=400, detail="Este cliente no tiene un GPS con SIM asignado.")
+
         result = send_gps_command(payload.command, sim_number)
         if not result["ok"]:
             raise HTTPException(status_code=500, detail=result["error"])
@@ -212,18 +210,76 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
         from app.sms_service import get_available_commands
         return get_available_commands()
 
-    # ── App cliente — login / logout / status ─────────────────────────────
+    @app.get("/admin/logs", dependencies=[Depends(_require_admin)])
+    def admin_logs(limit: int = Query(default=200, ge=1, le=500)):
+        from app.db import get_conn
+
+        logs = []
+
+        with get_conn() as conn:
+            cur = conn.cursor()
+
+            try:
+                cur.execute("""
+                    SELECT
+                        id,
+                        from_number,
+                        body,
+                        received_at,
+                        label,
+                        icon,
+                        lat,
+                        lng,
+                        speed,
+                        battery
+                    FROM gps_messages
+                    ORDER BY received_at DESC
+                    LIMIT %s
+                """, (limit,))
+                rows = cur.fetchall()
+
+                for r in rows:
+                    d = dict(r)
+                    logs.append({
+                        "id": d.get("id"),
+                        "type": "incoming",
+                        "source": "gps",
+                        "from_number": d.get("from_number"),
+                        "to_number": None,
+                        "body": d.get("body"),
+                        "message": d.get("body"),
+                        "label": d.get("label"),
+                        "icon": d.get("icon"),
+                        "lat": d.get("lat"),
+                        "lng": d.get("lng"),
+                        "speed": d.get("speed"),
+                        "battery": d.get("battery"),
+                        "created_at": d.get("received_at"),
+                        "received_at": d.get("received_at"),
+                    })
+
+            except Exception:
+                logs = []
+
+        return {
+            "ok": True,
+            "logs": logs,
+            "total": len(logs),
+        }
 
     @app.post("/app/login")
     def app_login(payload: AppLoginRequest):
         from app.admin_repository import get_client_for_login
+
         row = get_client_for_login(payload.username, payload.password)
         if not row:
             raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
         if not row.get("sim_number"):
             raise HTTPException(status_code=400, detail="Este cliente no tiene un GPS asignado aún.")
+
         token = _secrets.token_hex(32)
         _app_tokens[token] = row["id"]
+
         return {
             "ok": True,
             "token": token,
@@ -243,12 +299,15 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
     def app_status(client_id: str = Depends(_require_app_token)):
         from app.admin_repository import get_client
         from app.repository import get_vehicle
+
         cli = get_client(client_id)
         if not cli:
             raise HTTPException(status_code=404)
+
         veh = get_vehicle(cli["vehicle_id"]) if cli.get("vehicle_id") else None
         if not veh:
             raise HTTPException(status_code=404, detail="Vehículo no encontrado.")
+
         return {
             "vehicle_id": veh["id"],
             "vehicle_name": veh["name"],
@@ -260,14 +319,8 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
             "updated_at": veh.get("updated_at", ""),
         }
 
-    # ── App cliente — enviar comando via Gateway ──────────────────────────
-
     @app.post("/app/command")
     def app_command(payload: AppCommandRequest, client_id: str = Depends(_require_app_token)):
-        """
-        APK cliente envía comando GPS vía backend → Gateway → SMS al GPS.
-        No requiere permisos de SMS en el teléfono del cliente.
-        """
         from app.admin_repository import get_client
         from app.gateway_routes import queue_sms, GPS_COMMANDS, build_sms
         from app.config import GPS_PASSWORD
@@ -293,14 +346,8 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
             "label": cmd_info["label"],
         }
 
-    # ── App cliente — consultar respuestas del GPS ────────────────────────
-
     @app.get("/app/responses")
     def app_responses(client_id: str = Depends(_require_app_token)):
-        """
-        APK cliente consulta las últimas respuestas del GPS.
-        Filtra por el SIM asignado al cliente autenticado.
-        """
         from app.admin_repository import get_client
         from app.db import get_conn
 
