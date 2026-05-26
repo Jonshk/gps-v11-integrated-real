@@ -135,7 +135,16 @@ def get_all_clients() -> list[dict]:
 def get_client(client_id: str) -> dict | None:
     with get_conn() as conn:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM app_clients WHERE id = %s", (client_id,))
+        cur.execute("""
+            SELECT c.*,
+                   d.sim_number,
+                   d.name AS device_name,
+                   v.name AS vehicle_name
+            FROM app_clients c
+            LEFT JOIN gps_devices d ON c.gps_device_id = d.id
+            LEFT JOIN vehicles v ON c.vehicle_id = v.id
+            WHERE c.id = %s
+        """, (client_id,))
         row = cur.fetchone()
         return dict(row) if row else None
 
