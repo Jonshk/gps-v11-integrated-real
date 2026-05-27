@@ -322,7 +322,7 @@ export default function ComandosPage() {
           )}
 
           {/* Content grid — todo en pantalla */}
-          <div style={{ flex:1, display:"grid", gridTemplateColumns:"1fr 300px", gridTemplateRows:"1fr 1fr", overflow:"hidden", padding:"14px 24px 16px", gap:"12px" }}>
+          <div style={{ flex:1, display:"grid", gridTemplateColumns:"1fr 300px", gridTemplateRows:"1fr 1fr", gap:0, overflow:"hidden", padding:"14px 24px 16px", gap:"12px" }}>
 
             {/* Mapa — row span 2 */}
             <div style={{ gridRow:"1 / 3", background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:16, overflow:"hidden" }}>

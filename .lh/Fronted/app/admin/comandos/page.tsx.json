@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 5,
+            "activePatchIndex": 6,
             "patches": [
                 {
                     "date": 1779542393323,
@@ -28,6 +28,10 @@
                 {
                     "date": 1779571176018,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -321,9 +321,9 @@\n             </div>\r\n           )}\r\n \r\n           {/* Content grid — todo en pantalla */}\r\n-          <div style={{ flex:1, display:\"grid\", gridTemplateColumns:\"1fr 300px\", gridTemplateRows:\"1fr 1fr\", overflow:\"hidden\", padding:\"14px 24px 16px\", gap:\"12px\" }}>\r\n+          <div style={{ flex:1, display:\"grid\", gridTemplateColumns:\"1fr 300px\", gridTemplateRows:\"1fr 1fr\", gap:0, overflow:\"hidden\", padding:\"14px 24px 16px\", gap:\"12px\" }}>\r\n \r\n             {/* Mapa — row span 2 */}\r\n             <div style={{ gridRow:\"1 / 3\", background:\"rgba(255,255,255,0.02)\", border:\"1px solid rgba(255,255,255,0.07)\", borderRadius:16, overflow:\"hidden\" }}>\r\n               {position ? (\r\n"
+                },
+                {
+                    "date": 1779571959852,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -321,9 +321,9 @@\n             </div>\r\n           )}\r\n \r\n           {/* Content grid — todo en pantalla */}\r\n-          <div style={{ flex:1, display:\"grid\", gridTemplateColumns:\"1fr 300px\", gridTemplateRows:\"1fr 1fr\", gap:0, overflow:\"hidden\", padding:\"14px 24px 16px\", gap:\"12px\" }}>\r\n+          <div style={{ flex:1, display:\"grid\", gridTemplateColumns:\"1fr 300px\", gridTemplateRows:\"1fr 1fr\", overflow:\"hidden\", padding:\"14px 24px 16px\", gap:\"12px\" }}>\r\n \r\n             {/* Mapa — row span 2 */}\r\n             <div style={{ gridRow:\"1 / 3\", background:\"rgba(255,255,255,0.02)\", border:\"1px solid rgba(255,255,255,0.07)\", borderRadius:16, overflow:\"hidden\" }}>\r\n               {position ? (\r\n"
                 }
             ],
             "date": 1779542393323,
