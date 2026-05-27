@@ -92,11 +92,11 @@ function CommandCard({ cmd, state, response, onSend, disabled }: {
         background: "transparent",
         border: "none",
         cursor: disabled ? "not-allowed" : "pointer",
-        textAlign: "left", width: "100%", height: "100%",
+        textAlign: "left", width: "100%",
         opacity: disabled && !isActive ? 0.5 : 1,
       }}>
       <div style={{
-        padding: "16px", height: "100%", boxSizing: "border-box",
+        padding: "16px",
         background: hasResp ? `${cmd.color}08` : isActive ? `${cmd.color}0c` : hov ? "#fff" : "rgba(255,255,255,0.82)",
         border: `1.5px solid ${hasResp ? `${cmd.color}40` : isActive ? `${cmd.color}50` : hov ? `${cmd.color}30` : "rgba(0,0,0,0.07)"}`,
         borderRadius: 16,
@@ -376,11 +376,11 @@ export default function ComandosPage() {
             )}
           </div>
 
-          {/* Contenido — grid: mapa arriba fijo, comandos abajo ocupan el resto */}
-          <div style={{ flex: 1, overflow: "hidden", padding: "14px 20px 16px", display: "grid", gridTemplateRows: "260px 1fr", gap: 14 }}>
+          {/* Contenido scrollable */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
 
             {/* Mapa */}
-            <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 16px rgba(0,0,0,0.07)" }}>
+            <div style={{ height: 260, borderRadius: 16, overflow: "hidden", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 2px 16px rgba(0,0,0,0.07)", flexShrink: 0 }}>
               {position ? (
                 <iframe key={`${position.lat}-${position.lng}`}
                   src={`https://maps.google.com/maps?q=${position.lat},${position.lng}&z=15&output=embed`}
@@ -398,10 +398,10 @@ export default function ComandosPage() {
               )}
             </div>
 
-            {/* Grid comandos 4 columnas — llena el espacio restante */}
-            <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.18em", color: "#9ca3af", textTransform: "uppercase", margin: "0 0 10px 2px", flexShrink: 0 }}>Comandos SMS</p>
-              <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gridTemplateRows: "repeat(3, 1fr)", gap: 10 }}>
+            {/* Grid comandos 4 columnas */}
+            <div>
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.18em", color: "#9ca3af", textTransform: "uppercase", margin: "0 0 10px 2px" }}>Comandos SMS</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
                 {ALL_COMMANDS.map(cmd => (
                   <CommandCard
                     key={cmd.key} cmd={cmd}
