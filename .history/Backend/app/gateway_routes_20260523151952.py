@@ -23,25 +23,32 @@ class ConfirmPayload(BaseModel):
 
 class GatewaySendPayload(BaseModel):
     client_id: str
-    command: str
+    command: str  # key del comando, ej: "locate", "stop_engine", etc.
 
 
 # ── Comandos GPS TK103 completos ──────────────────────────────────────────
 
 GPS_COMMANDS = {
+    # Localización
     "tracker":        {"sms": "tracker{p}",         "label": "Activar tracker",       "icon": "📡", "color": "#00d4a0", "sequence": None},
     "locate":         {"sms": "check{p}",            "label": "Pedir ubicación",       "icon": "📍", "color": "#00d4a0", "sequence": ["tracker", "locate"]},
+    # Motor
     "stop_engine":    {"sms": "stopelec{p}",         "label": "Apagar motor",          "icon": "🔴", "color": "#e8232a", "sequence": None},
     "start_engine":   {"sms": "supplyelec{p}",       "label": "Encender motor",        "icon": "🟢", "color": "#00d4a0", "sequence": None},
+    # Alertas
     "move_alert":     {"sms": "move{p}",             "label": "Alerta movimiento",     "icon": "🚨", "color": "#fbbf24", "sequence": None},
     "speed_alert":    {"sms": "speed{p} 080",        "label": "Alerta velocidad 80",   "icon": "⚡", "color": "#fb923c", "sequence": None},
     "no_speed":       {"sms": "nospeed{p}",          "label": "Desactivar vel.",       "icon": "✋", "color": "#6b7280", "sequence": None},
+    # Micrófono — requiere llamada posterior
     "monitor":        {"sms": "monitor{p}",          "label": "Activar micrófono",     "icon": "🎤", "color": "#a78bfa", "sequence": None, "call_after": True},
+    # Tracking en vivo
     "live_track":     {"sms": "fix030s999n{p}",      "label": "Tracking en vivo",      "icon": "🗺️", "color": "#60a5fa", "sequence": None},
     "stop_track":     {"sms": "nofix{p}",            "label": "Parar tracking",        "icon": "⏹️", "color": "#6b7280", "sequence": None},
+    # Info
     "status":         {"sms": "status{p}",           "label": "Estado GPS",            "icon": "ℹ️", "color": "#60a5fa", "sequence": None},
     "battery":        {"sms": "battery{p}",          "label": "Estado batería",        "icon": "🔋", "color": "#34d399", "sequence": None},
     "gprs":           {"sms": "gprs{p}",             "label": "Estado GPRS",           "icon": "📶", "color": "#60a5fa", "sequence": None},
+    # Config
     "reset":          {"sms": "reset{p}",            "label": "Reiniciar GPS",         "icon": "🔄", "color": "#fb923c", "sequence": None},
     "set_admin":      {"sms": "admin{p} {phone}",    "label": "Configurar admin",      "icon": "👤", "color": "#6b7280", "sequence": None},
 }
@@ -53,7 +60,7 @@ def build_sms(command_key: str, password: str, phone: str = "") -> str:
     return cmd["sms"].format(p=password, phone=phone)
 
 
-# ── Parser de respuestas TK103 ─────────────────────────────────────────────
+# ── Parser de respuestas TK103 profesional ─────────────────────────────────
 
 def parse_gps_response(body: str) -> dict:
     result = {
@@ -68,6 +75,7 @@ def parse_gps_response(body: str) -> dict:
     }
     b = body.lower().strip()
 
+    # ── Ubicación con Google Maps link ──
     if "maps.google.com" in b or "maps?q=" in b:
         result["parsed_type"] = "location"
         result["label"] = "📍 Ubicación recibida"
@@ -78,12 +86,15 @@ def parse_gps_response(body: str) -> dict:
                 result["lat"] = float(coords.group(1))
                 result["lng"] = float(coords.group(2))
             speed = re.search(r"speed[:\s]*([\d.]+)", b)
-            if speed: result["speed"] = float(speed.group(1))
+            if speed:
+                result["speed"] = float(speed.group(1))
             bat = re.search(r"bat[:\s]*([\d]+)%?", b)
-            if bat: result["battery"] = int(bat.group(1))
+            if bat:
+                result["battery"] = int(bat.group(1))
         except Exception:
             pass
 
+    # ── lat/lng directo sin maps link ──
     elif re.search(r"lat[:\s]*([-\d.]+)", b) and re.search(r"lng?[:\s]*([-\d.]+)", b):
         result["parsed_type"] = "location"
         result["label"] = "📍 Ubicación recibida"
@@ -98,26 +109,31 @@ def parse_gps_response(body: str) -> dict:
         except Exception:
             pass
 
+    # ── Motor apagado ──
     elif "stop engine" in b or "stop ok" in b or "stopelec ok" in b:
         result["parsed_type"] = "engine_stopped"
         result["label"] = "🔴 Motor apagado correctamente"
         result["icon"] = "🔴"
 
+    # ── Motor encendido ──
     elif "supply engine" in b or "supply ok" in b or "resume" in b or "supplyelec ok" in b:
         result["parsed_type"] = "engine_started"
         result["label"] = "🟢 Motor encendido correctamente"
         result["icon"] = "🟢"
 
+    # ── Tracker OK ──
     elif "tracker ok" in b:
         result["parsed_type"] = "tracker_ok"
         result["label"] = "📡 Modo tracker activado"
         result["icon"] = "📡"
 
+    # ── Monitor/micrófono ──
     elif "monitor ok" in b:
         result["parsed_type"] = "monitor_ok"
         result["label"] = "🎤 Micrófono activado — llama al GPS"
         result["icon"] = "🎤"
 
+    # ── Alerta movimiento ──
     elif "move alarm" in b or "move ok" in b:
         result["parsed_type"] = "move_alert"
         result["label"] = "🚨 Alerta de movimiento"
@@ -130,16 +146,19 @@ def parse_gps_response(body: str) -> dict:
         except Exception:
             pass
 
+    # ── Alerta velocidad ──
     elif "speed ok" in b or "overspeed" in b:
         result["parsed_type"] = "speed_alert"
         result["label"] = "⚡ Alerta de velocidad"
         result["icon"] = "⚡"
 
+    # ── Tracking en vivo ──
     elif "fix ok" in b or "tracking" in b:
         result["parsed_type"] = "live_track_ok"
         result["label"] = "🗺️ Tracking en vivo activado"
         result["icon"] = "🗺️"
 
+    # ── Batería ──
     elif "battery" in b or "power" in b:
         result["parsed_type"] = "battery"
         result["label"] = "🔋 Estado de batería"
@@ -150,21 +169,25 @@ def parse_gps_response(body: str) -> dict:
         except Exception:
             pass
 
+    # ── GPRS ──
     elif "gprs ok" in b:
         result["parsed_type"] = "gprs_ok"
         result["label"] = "📶 GPRS OK"
         result["icon"] = "📶"
 
+    # ── SOS ──
     elif "sos" in b:
         result["parsed_type"] = "sos_alert"
         result["label"] = "🆘 ALERTA SOS"
         result["icon"] = "🆘"
 
+    # ── Reset ──
     elif "reset ok" in b or "reboot" in b:
         result["parsed_type"] = "reset_ok"
         result["label"] = "🔄 GPS reiniciado"
         result["icon"] = "🔄"
 
+    # ── Status ──
     elif "status" in b or "imei" in b:
         result["parsed_type"] = "status"
         result["label"] = "ℹ️ Estado del GPS"
@@ -257,7 +280,9 @@ def save_message(from_number: str, body: str, parsed: dict) -> dict:
         ))
         msg_id = cur.fetchone()["id"]
 
+        # Si tiene ubicación → guardar también en gps_positions
         if parsed.get("lat") and parsed.get("lng"):
+            # Buscar client_id por número
             cur.execute("""
                 SELECT c.id FROM app_clients c
                 JOIN gps_devices d ON c.gps_device_id = d.id
@@ -314,20 +339,12 @@ def register_gateway_routes(app: FastAPI, require_admin_fn) -> None:
         with get_conn() as conn:
             cur = conn.cursor()
             cur.execute("""
-                SELECT id, to_number, body, command FROM sms_queue
+                SELECT id, to_number, body FROM sms_queue
                 WHERE status = 'pending'
                 ORDER BY created_at ASC LIMIT 10
             """)
             rows = [dict(r) for r in cur.fetchall()]
-        return [
-            {
-                "id":      r["id"],
-                "to":      r["to_number"],
-                "body":    r["body"],
-                "command": r["command"] or "",
-            }
-            for r in rows
-        ]
+        return [{"id": r["id"], "to": r["to_number"], "body": r["body"]} for r in rows]
 
     # ── APK confirma envío ────────────────────────────────────────────────
     @app.post("/gateway/confirm")
@@ -366,6 +383,7 @@ def register_gateway_routes(app: FastAPI, require_admin_fn) -> None:
         if not cli:
             raise HTTPException(status_code=404, detail="Cliente no encontrado.")
 
+        # Obtener SIM del dispositivo
         sim_number = cli.get("sim_number")
         if not sim_number and cli.get("gps_device_id"):
             dev = get_device(cli["gps_device_id"])
@@ -373,10 +391,12 @@ def register_gateway_routes(app: FastAPI, require_admin_fn) -> None:
         if not sim_number:
             raise HTTPException(status_code=400, detail="Sin SIM asignado.")
 
+        # Obtener comando
         cmd_info = GPS_COMMANDS.get(payload.command)
         if not cmd_info:
             raise HTTPException(status_code=400, detail=f"Comando desconocido: {payload.command}")
 
+        # Manejar secuencias (ej: tracker + check para localizar)
         sequence = cmd_info.get("sequence")
         if sequence and len(sequence) > 1:
             ids = []
@@ -441,6 +461,7 @@ def register_gateway_routes(app: FastAPI, require_admin_fn) -> None:
     # ── Posición en tiempo real ───────────────────────────────────────────
     @app.get("/admin/live/{client_id}")
     def live_position(client_id: str, x_admin_token: str | None = Header(default=None)):
+        """Última posición conocida del cliente."""
         from app.admin_routes import _admin_sessions
         if not x_admin_token or x_admin_token not in _admin_sessions:
             raise HTTPException(status_code=401, detail="Admin token inválido.")
@@ -451,6 +472,7 @@ def register_gateway_routes(app: FastAPI, require_admin_fn) -> None:
 
     @app.get("/admin/live/{client_id}/history")
     def live_history(client_id: str, limit: int = 100, x_admin_token: str | None = Header(default=None)):
+        """Historial de posiciones para dibujar ruta."""
         from app.admin_routes import _admin_sessions
         if not x_admin_token or x_admin_token not in _admin_sessions:
             raise HTTPException(status_code=401, detail="Admin token inválido.")
