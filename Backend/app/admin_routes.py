@@ -23,7 +23,6 @@ def _require_app_token(x_app_token: str | None = Header(default=None)) -> str:
 class AdminLogin(BaseModel):
     password: str
 
-
 class DeviceCreate(BaseModel):
     name: str
     sim_number: str
@@ -31,7 +30,6 @@ class DeviceCreate(BaseModel):
     imei: Optional[str] = None
     vehicle_id: Optional[str] = None
     notes: Optional[str] = None
-
 
 class DeviceUpdate(BaseModel):
     name: Optional[str] = None
@@ -42,7 +40,6 @@ class DeviceUpdate(BaseModel):
     active: Optional[bool] = None
     notes: Optional[str] = None
 
-
 class ClientCreate(BaseModel):
     username: str
     password: str
@@ -51,7 +48,6 @@ class ClientCreate(BaseModel):
     phone: Optional[str] = None
     vehicle_id: Optional[str] = None
     gps_device_id: Optional[str] = None
-
 
 class ClientUpdate(BaseModel):
     username: Optional[str] = None
@@ -63,15 +59,12 @@ class ClientUpdate(BaseModel):
     gps_device_id: Optional[str] = None
     active: Optional[bool] = None
 
-
 class AppLoginRequest(BaseModel):
     username: str
     password: str
 
-
 class AppCommandRequest(BaseModel):
     command: str
-
 
 class SmsCommandRequest(BaseModel):
     command: str
@@ -92,6 +85,44 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
     def admin_logout(x_admin_token: str | None = Header(default=None)):
         if x_admin_token:
             _admin_sessions.discard(x_admin_token)
+        return {"ok": True}
+
+    # ── Preferencias del admin ────────────────────────────────────────────
+    @app.get("/admin/preferences")
+    def get_preferences(x_admin_token: str | None = Header(default=None)):
+        if not x_admin_token or x_admin_token not in _admin_sessions:
+            raise HTTPException(status_code=401, detail="Admin token inválido.")
+        from app.db import get_conn
+        with get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS admin_preferences (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            cur.execute("SELECT value FROM admin_preferences WHERE key = 'theme'")
+            row = cur.fetchone()
+        return {"theme": row["value"] if row else "dim"}
+
+    @app.post("/admin/preferences")
+    def save_preferences(payload: dict, x_admin_token: str | None = Header(default=None)):
+        if not x_admin_token or x_admin_token not in _admin_sessions:
+            raise HTTPException(status_code=401, detail="Admin token inválido.")
+        theme = payload.get("theme", "dim")
+        from app.db import get_conn
+        with get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS admin_preferences (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            cur.execute("""
+                INSERT INTO admin_preferences (key, value) VALUES ('theme', %s)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+            """, (theme,))
         return {"ok": True}
 
     @app.get("/admin/devices", dependencies=[Depends(_require_admin)])
@@ -187,19 +218,15 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
     def send_sms_command(payload: SmsCommandRequest):
         from app.admin_repository import get_client, get_device
         from app.sms_service import send_gps_command
-
         cli = get_client(payload.client_id)
         if not cli:
             raise HTTPException(status_code=404, detail="Cliente no encontrado.")
-
         sim_number = cli.get("sim_number")
         if not sim_number and cli.get("gps_device_id"):
             dev = get_device(cli["gps_device_id"])
             sim_number = dev.get("sim_number") if dev else None
-
         if not sim_number:
             raise HTTPException(status_code=400, detail="Este cliente no tiene un GPS con SIM asignado.")
-
         result = send_gps_command(payload.command, sim_number)
         if not result["ok"]:
             raise HTTPException(status_code=500, detail=result["error"])
@@ -213,72 +240,43 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
     @app.get("/admin/logs", dependencies=[Depends(_require_admin)])
     def admin_logs(limit: int = Query(default=200, ge=1, le=500)):
         from app.db import get_conn
-
         logs = []
-
         with get_conn() as conn:
             cur = conn.cursor()
-
             try:
                 cur.execute("""
-                    SELECT
-                        id,
-                        from_number,
-                        body,
-                        received_at,
-                        label,
-                        icon,
-                        lat,
-                        lng,
-                        speed,
-                        battery
+                    SELECT id, from_number, body, received_at, label, icon, lat, lng, speed, battery
                     FROM gps_messages
                     ORDER BY received_at DESC
                     LIMIT %s
                 """, (limit,))
-                rows = cur.fetchall()
-
-                for r in rows:
+                for r in cur.fetchall():
                     d = dict(r)
                     logs.append({
-                        "id": d.get("id"),
-                        "type": "incoming",
-                        "source": "gps",
-                        "from_number": d.get("from_number"),
-                        "to_number": None,
-                        "body": d.get("body"),
-                        "message": d.get("body"),
-                        "label": d.get("label"),
-                        "icon": d.get("icon"),
-                        "lat": d.get("lat"),
-                        "lng": d.get("lng"),
-                        "speed": d.get("speed"),
-                        "battery": d.get("battery"),
-                        "created_at": d.get("received_at"),
-                        "received_at": d.get("received_at"),
+                        "id": d.get("id"), "type": "incoming", "source": "gps",
+                        "from_number": d.get("from_number"), "to_number": None,
+                        "body": d.get("body"), "message": d.get("body"),
+                        "label": d.get("label"), "icon": d.get("icon"),
+                        "lat": d.get("lat"), "lng": d.get("lng"),
+                        "speed": d.get("speed"), "battery": d.get("battery"),
+                        "created_at": d.get("received_at"), "received_at": d.get("received_at"),
                     })
-
             except Exception:
                 logs = []
-
         return logs
 
     @app.post("/app/login")
     def app_login(payload: AppLoginRequest):
         from app.admin_repository import get_client_for_login
-
         row = get_client_for_login(payload.username, payload.password)
         if not row:
             raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
         if not row.get("sim_number"):
             raise HTTPException(status_code=400, detail="Este cliente no tiene un GPS asignado aún.")
-
         token = _secrets.token_hex(32)
         _app_tokens[token] = row["id"]
-
         return {
-            "ok": True,
-            "token": token,
+            "ok": True, "token": token,
             "client_name": row["client_name"],
             "vehicle_name": row.get("vehicle_name") or "",
             "vehicle_id": row.get("vehicle_id") or "",
@@ -295,23 +293,16 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
     def app_status(client_id: str = Depends(_require_app_token)):
         from app.admin_repository import get_client
         from app.repository import get_vehicle
-
         cli = get_client(client_id)
         if not cli:
             raise HTTPException(status_code=404)
-
         veh = get_vehicle(cli["vehicle_id"]) if cli.get("vehicle_id") else None
         if not veh:
             raise HTTPException(status_code=404, detail="Vehículo no encontrado.")
-
         return {
-            "vehicle_id": veh["id"],
-            "vehicle_name": veh["name"],
-            "status": veh["status"],
-            "lat": veh["lat"],
-            "lng": veh["lng"],
-            "speed": veh["speed"],
-            "geofence": veh.get("geofence"),
+            "vehicle_id": veh["id"], "vehicle_name": veh["name"],
+            "status": veh["status"], "lat": veh["lat"], "lng": veh["lng"],
+            "speed": veh["speed"], "geofence": veh.get("geofence"),
             "updated_at": veh.get("updated_at", ""),
         }
 
@@ -320,43 +311,30 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
         from app.admin_repository import get_client
         from app.gateway_routes import queue_sms, GPS_COMMANDS, build_sms
         from app.config import GPS_PASSWORD
-
         cli = get_client(client_id)
         if not cli:
             raise HTTPException(status_code=404, detail="Cliente no encontrado.")
-
         sim = cli.get("sim_number")
         if not sim:
             raise HTTPException(status_code=400, detail="Este cliente no tiene GPS asignado.")
-
         cmd_info = GPS_COMMANDS.get(payload.command)
         if not cmd_info:
             raise HTTPException(status_code=400, detail=f"Comando desconocido: {payload.command}")
-
         sms_body = build_sms(payload.command, GPS_PASSWORD)
         cmd_id = queue_sms(sim, sms_body, client_id, payload.command)
-
-        return {
-            "ok": True,
-            "command_id": cmd_id,
-            "label": cmd_info["label"],
-        }
+        return {"ok": True, "command_id": cmd_id, "label": cmd_info["label"]}
 
     @app.get("/app/responses")
     def app_responses(client_id: str = Depends(_require_app_token)):
         from app.admin_repository import get_client
         from app.db import get_conn
-
         cli = get_client(client_id)
         if not cli:
             raise HTTPException(status_code=404)
-
         sim = cli.get("sim_number", "")
         if not sim:
             return []
-
         sim_tail = sim[-7:]
-
         with get_conn() as conn:
             cur = conn.cursor()
             cur.execute("""
@@ -366,6 +344,4 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
                 ORDER BY received_at DESC
                 LIMIT 20
             """, (f"%{sim_tail}",))
-            rows = [dict(r) for r in cur.fetchall()]
-
-        return rows
+            return [dict(r) for r in cur.fetchall()]
