@@ -356,10 +356,10 @@ def register_gateway_routes(app: FastAPI, require_admin_fn) -> None:
     # ── Admin envía comando al GPS via gateway ────────────────────────────
     @app.post("/admin/gateway/send")
     def admin_gateway_send(payload: GatewaySendPayload, x_admin_token: str | None = Header(default=None)):
-        from app.security import validate_admin_session
+        from app.admin_routes import _admin_sessions
         from app.admin_repository import get_client, get_device
         from app.config import GPS_PASSWORD
-        if not x_admin_token or not validate_admin_session(x_admin_token):
+        if not x_admin_token or x_admin_token not in _admin_sessions:
             raise HTTPException(status_code=401, detail="Admin token inválido.")
 
         cli = get_client(payload.client_id)
@@ -407,8 +407,8 @@ def register_gateway_routes(app: FastAPI, require_admin_fn) -> None:
     # ── Lista de comandos disponibles ─────────────────────────────────────
     @app.get("/admin/gateway/commands")
     def list_commands(x_admin_token: str | None = Header(default=None)):
-        from app.security import validate_admin_session
-        if not x_admin_token or not validate_admin_session(x_admin_token):
+        from app.admin_routes import _admin_sessions
+        if not x_admin_token or x_admin_token not in _admin_sessions:
             raise HTTPException(status_code=401, detail="Admin token inválido.")
         return [
             {"key": k, "label": v["label"], "icon": v["icon"],
@@ -420,8 +420,8 @@ def register_gateway_routes(app: FastAPI, require_admin_fn) -> None:
     # ── Mensajes recibidos del GPS ────────────────────────────────────────
     @app.get("/admin/gps-messages")
     def list_gps_messages(x_admin_token: str | None = Header(default=None), limit: int = 50):
-        from app.security import validate_admin_session
-        if not x_admin_token or not validate_admin_session(x_admin_token):
+        from app.admin_routes import _admin_sessions
+        if not x_admin_token or x_admin_token not in _admin_sessions:
             raise HTTPException(status_code=401, detail="Admin token inválido.")
         with get_conn() as conn:
             cur = conn.cursor()
@@ -430,8 +430,8 @@ def register_gateway_routes(app: FastAPI, require_admin_fn) -> None:
 
     @app.delete("/admin/gps-messages")
     def clear_gps_messages(x_admin_token: str | None = Header(default=None)):
-        from app.security import validate_admin_session
-        if not x_admin_token or not validate_admin_session(x_admin_token):
+        from app.admin_routes import _admin_sessions
+        if not x_admin_token or x_admin_token not in _admin_sessions:
             raise HTTPException(status_code=401, detail="Admin token inválido.")
         with get_conn() as conn:
             cur = conn.cursor()
@@ -441,8 +441,8 @@ def register_gateway_routes(app: FastAPI, require_admin_fn) -> None:
     # ── Posición en tiempo real ───────────────────────────────────────────
     @app.get("/admin/live/{client_id}")
     def live_position(client_id: str, x_admin_token: str | None = Header(default=None)):
-        from app.security import validate_admin_session
-        if not x_admin_token or not validate_admin_session(x_admin_token):
+        from app.admin_routes import _admin_sessions
+        if not x_admin_token or x_admin_token not in _admin_sessions:
             raise HTTPException(status_code=401, detail="Admin token inválido.")
         pos = get_last_position(client_id)
         if not pos:
@@ -451,16 +451,16 @@ def register_gateway_routes(app: FastAPI, require_admin_fn) -> None:
 
     @app.get("/admin/live/{client_id}/history")
     def live_history(client_id: str, limit: int = 100, x_admin_token: str | None = Header(default=None)):
-        from app.security import validate_admin_session
-        if not x_admin_token or not validate_admin_session(x_admin_token):
+        from app.admin_routes import _admin_sessions
+        if not x_admin_token or x_admin_token not in _admin_sessions:
             raise HTTPException(status_code=401, detail="Admin token inválido.")
         return get_position_history(client_id, limit)
 
     # ── Estado de la cola ─────────────────────────────────────────────────
     @app.get("/admin/gateway/queue")
     def gateway_queue(x_admin_token: str | None = Header(default=None), limit: int = 50):
-        from app.security import validate_admin_session
-        if not x_admin_token or not validate_admin_session(x_admin_token):
+        from app.admin_routes import _admin_sessions
+        if not x_admin_token or x_admin_token not in _admin_sessions:
             raise HTTPException(status_code=401, detail="Admin token inválido.")
         with get_conn() as conn:
             cur = conn.cursor()
