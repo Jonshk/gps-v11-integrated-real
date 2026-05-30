@@ -1,0 +1,18 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+APP_NAME        = os.getenv("APP_NAME", "GPS Backend EC")
+API_WRITE_KEY   = os.getenv("API_WRITE_KEY", "changeme123")
+ADMIN_PASSWORD  = os.getenv("ADMIN_PASSWORD", "admin123")
+DB_FILE         = os.getenv("DB_FILE", "data.db")
+GPS_PASSWORD    = os.getenv("GPS_PASSWORD", "123456")
+CORS_ORIGINS    = [
+    item.strip()
+    for item in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000,https://gpscontrolec.com,https://www.gpscontrolec.com"
+    ).split(",")
+    if item.strip()
+]

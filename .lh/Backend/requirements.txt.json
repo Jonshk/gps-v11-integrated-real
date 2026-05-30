@@ -1,0 +1,18 @@
+{
+    "sourceFile": "Backend/requirements.txt",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1780172797362,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1780172797362,
+            "name": "Commit-0",
+            "content": "# requirements.txt  (versión completa final)\r\n# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\r\n# Va en: Backend/requirements.txt  (REEMPLAZAR)\r\n\r\n# ── Core ──────────────────────────────────────────────────────\r\nfastapi==0.111.0\r\nuvicorn[standard]==0.30.1\r\npydantic==2.7.1\r\npython-dotenv==1.0.1\r\n\r\n# ── Base de datos ─────────────────────────────────────────────\r\npsycopg[binary]==3.1.19\r\n\r\n# ── Seguridad ─────────────────────────────────────────────────\r\nbcrypt==4.1.3\r\nslowapi==0.1.9           # rate limiting alternativo (opcional, usamos el nuestro)\r\n\r\n# ── HTTP client ───────────────────────────────────────────────\r\nhttpx==0.27.0\r\n\r\n# ── Reportes ─────────────────────────────────────────────────\r\nreportlab==4.1.0\r\nopenpyxl==3.1.2\r\n\r\n# ── Redis (para WebSockets multi-instancia) ───────────────────\r\n# Solo necesario si configuras REDIS_URL en .env\r\nredis==5.0.4\r\n\r\n# ── Logging / Monitoreo (opcionales) ─────────────────────────\r\n# Descomentar según lo que uses:\r\n# sentry-sdk[fastapi]==2.5.1\r\n# logtail-python==0.3.3\r\n\r\n# ── Firebase (push notifications, opcional) ───────────────────\r\n# firebase-admin==6.5.0"
+        }
+    ]
+}

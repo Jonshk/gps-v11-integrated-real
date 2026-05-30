@@ -1,0 +1,18 @@
+{
+    "sourceFile": "Backend/migrate_security_clean.py",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1780172797363,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1780172797363,
+            "name": "Commit-0",
+            "content": "\"\"\"\r\nmigrate_security.py  (versión limpia sin credenciales)\r\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\r\nVa en:   Backend/  (raíz)\r\nCorrer:  python migrate_security.py\r\nBorrar después.\r\n\r\nRequiere que DATABASE_URL esté en Backend/.env\r\npip install bcrypt\r\n\"\"\"\r\nfrom __future__ import annotations\r\nimport os, bcrypt\r\nfrom dotenv import load_dotenv\r\nload_dotenv()   # lee .env automáticamente\r\n\r\nimport psycopg\r\nfrom psycopg.rows import dict_row\r\n\r\nDATABASE_URL = os.getenv(\"DATABASE_URL\")\r\nif not DATABASE_URL:\r\n    raise SystemExit(\"❌  DATABASE_URL no encontrado en .env\")\r\n\r\n\r\ndef run():\r\n    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)\r\n    try:\r\n        cur = conn.cursor()\r\n\r\n        # 1. Tabla sesiones admin persistentes\r\n        cur.execute(\"\"\"\r\n            CREATE TABLE IF NOT EXISTS admin_sessions (\r\n                token      TEXT PRIMARY KEY,\r\n                created_at TIMESTAMPTZ DEFAULT NOW(),\r\n                expires_at TIMESTAMPTZ,\r\n                ip_address TEXT\r\n            )\r\n        \"\"\")\r\n        conn.commit(); print(\"✅  admin_sessions\")\r\n\r\n        # 2. Tabla rate limiting\r\n        cur.execute(\"\"\"\r\n            CREATE TABLE IF NOT EXISTS rate_limit_log (\r\n                id         SERIAL PRIMARY KEY,\r\n                ip_address TEXT NOT NULL,\r\n                endpoint   TEXT NOT NULL,\r\n                created_at TIMESTAMPTZ DEFAULT NOW()\r\n            )\r\n        \"\"\")\r\n        cur.execute(\"\"\"\r\n            CREATE INDEX IF NOT EXISTS idx_rl_ip_ep\r\n            ON rate_limit_log(ip_address, endpoint, created_at)\r\n        \"\"\")\r\n        conn.commit(); print(\"✅  rate_limit_log\")\r\n\r\n        # 3. Columna password_hashed\r\n        cur.execute(\"\"\"\r\n            ALTER TABLE app_clients\r\n            ADD COLUMN IF NOT EXISTS password_hashed TEXT\r\n        \"\"\")\r\n        conn.commit(); print(\"✅  columna password_hashed\")\r\n\r\n        # 4. Hashear contraseñas existentes\r\n        cur.execute(\"SELECT id, password FROM app_clients WHERE password_hashed IS NULL\")\r\n        rows = cur.fetchall(); count = 0\r\n        for row in rows:\r\n            plain = row[\"password\"] or \"\"\r\n            if not plain: continue\r\n            if plain.startswith(\"$2b$\") or plain.startswith(\"$2a$\"):\r\n                cur.execute(\"UPDATE app_clients SET password_hashed=%s WHERE id=%s\", (plain, row[\"id\"]))\r\n                print(f\"⏭️   {row['id']} — ya hasheada, copiada\")\r\n                continue\r\n            hashed = bcrypt.hashpw(plain.encode(), bcrypt.gensalt(rounds=12)).decode()\r\n            cur.execute(\r\n                \"UPDATE app_clients SET password_hashed=%s WHERE id=%s\",\r\n                (hashed, row[\"id\"])\r\n            )\r\n            count += 1\r\n\r\n        conn.commit()\r\n        print(f\"🔑  {count} contraseñas hasheadas con bcrypt\")\r\n        print(\"\\n✅  Migración de seguridad completada.\")\r\n\r\n    finally:\r\n        conn.close()\r\n\r\n\r\nif __name__ == \"__main__\":\r\n    run()"
+        }
+    ]
+}

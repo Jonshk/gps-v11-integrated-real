@@ -1,0 +1,18 @@
+{
+    "sourceFile": "Backend/app/ws_routes.py",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1780172797369,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1780172797369,
+            "name": "Commit-0",
+            "content": "\"\"\"\r\nws_routes.py\r\nVa en: Backend/app/ws_routes.py\r\n\"\"\"\r\nfrom __future__ import annotations\r\nfrom fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query\r\nfrom app.ws_manager import manager\r\nfrom app.db import get_conn\r\nimport logging\r\n\r\nlogger = logging.getLogger(__name__)\r\n\r\n\r\ndef register_ws_routes(app: FastAPI) -> None:\r\n\r\n    # ── WS cliente individual ─────────────────────────────────\r\n    # ws://host/ws/vehicle/{vehicle_id}?token=xxx\r\n    @app.websocket(\"/ws/vehicle/{vehicle_id}\")\r\n    async def ws_vehicle(websocket: WebSocket, vehicle_id: str, token: str = Query(...)):\r\n        with get_conn() as conn:\r\n            cur = conn.cursor()\r\n            cur.execute(\r\n                \"SELECT id FROM app_clients WHERE ws_token = %s AND active = TRUE\",\r\n                (token,)\r\n            )\r\n            row = cur.fetchone()\r\n        if not row:\r\n            await websocket.close(code=4001)\r\n            return\r\n\r\n        key = f\"vehicle_{vehicle_id}_{row['id']}\"\r\n        await manager.connect(websocket, key)\r\n        try:\r\n            while True:\r\n                msg = await websocket.receive_text()\r\n                if msg == \"ping\":\r\n                    await websocket.send_text(\"pong\")\r\n        except WebSocketDisconnect:\r\n            manager.disconnect(websocket, key)\r\n\r\n    # ── WS flota ──────────────────────────────────────────────\r\n    # ws://host/ws/fleet/{client_id}?token=xxx\r\n    @app.websocket(\"/ws/fleet/{client_id}\")\r\n    async def ws_fleet(websocket: WebSocket, client_id: str, token: str = Query(...)):\r\n        with get_conn() as conn:\r\n            cur = conn.cursor()\r\n            cur.execute(\r\n                \"SELECT id FROM app_clients WHERE ws_token = %s AND id = %s AND active = TRUE\",\r\n                (token, client_id)\r\n            )\r\n            row = cur.fetchone()\r\n        if not row:\r\n            await websocket.close(code=4001)\r\n            return\r\n\r\n        key = f\"fleet_{client_id}\"\r\n        await manager.connect(websocket, key)\r\n        try:\r\n            while True:\r\n                msg = await websocket.receive_text()\r\n                if msg == \"ping\":\r\n                    await websocket.send_text(\"pong\")\r\n        except WebSocketDisconnect:\r\n            manager.disconnect(websocket, key)"
+        }
+    ]
+}

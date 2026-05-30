@@ -1,0 +1,18 @@
+{
+    "sourceFile": "Fronted/lib/useClientSession.ts",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1780173122595,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1780173122595,
+            "name": "Commit-0",
+            "content": "'use client'\r\n// useClientSession.ts\r\n// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\r\n// Va en: Fronted/lib/useClientSession.ts  (CREAR)\r\n\r\nimport { useEffect, useState } from 'react'\r\nimport { useRouter } from 'next/navigation'\r\n\r\nexport interface FleetVehicle {\r\n  id: string\r\n  device_id: string\r\n  name: string\r\n  plate: string\r\n  phone?: string\r\n  lat?: number\r\n  lng?: number\r\n  speed?: number\r\n  heading?: number\r\n  battery?: number\r\n  status?: 'active' | 'idle' | 'offline'\r\n}\r\n\r\nexport interface ClientSession {\r\n  client_id: string\r\n  client_name: string\r\n  username: string\r\n  account_type: 'individual' | 'fleet'\r\n  ws_token: string\r\n  token: string\r\n  phone?: string\r\n  vehicle_id?: string\r\n  sim_number?: string\r\n  vehicles: FleetVehicle[]\r\n}\r\n\r\nexport function useClientSession() {\r\n  const router = useRouter()\r\n  const [session, setSession] = useState<ClientSession | null>(null)\r\n\r\n  useEffect(() => {\r\n    const raw = sessionStorage.getItem('gps_session')\r\n    if (!raw) { router.push('/client/login'); return }\r\n    try { setSession(JSON.parse(raw)) }\r\n    catch { router.push('/client/login') }\r\n  }, [])\r\n\r\n  function logout() {\r\n    sessionStorage.removeItem('gps_session')\r\n    router.push('/client/login')\r\n  }\r\n\r\n  return { session, logout }\r\n}\r\n\r\nexport const STATUS_COLOR: Record<string, string> = {\r\n  active: '#22c55e', idle: '#f59e0b', offline: '#ef4444',\r\n}\r\nexport const STATUS_LABEL: Record<string, string> = {\r\n  active: 'En ruta', idle: 'Detenido', offline: 'Sin señal',\r\n}\r\n\r\nexport const API    = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'\r\nexport const WS_URL = process.env.NEXT_PUBLIC_WS_URL  || 'ws://localhost:8000'"
+        }
+    ]
+}
