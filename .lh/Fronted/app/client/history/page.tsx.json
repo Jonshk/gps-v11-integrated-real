@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1780173122597,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1780177980884,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,22 +1,13 @@\n 'use client'\r\n-// history_page.tsx  (CON REPLAY)\r\n-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\r\n-// Va en: Fronted/app/client/history/page.tsx  (REEMPLAZAR)\r\n-//\r\n-// Añade vs versión anterior:\r\n-// - Botón ▶ Replay que anima el marcador punto a punto\r\n-// - Control de velocidad del replay (1x, 2x, 5x, 10x)\r\n-// - Barra de progreso del replay\r\n-// - Odómetro del día en el resumen\r\n-\r\n-import { useEffect, useRef, useState, useCallback } from 'react'\r\n+import { Suspense } from 'react'\r\n+import { useEffect, useRef, useState } from 'react'\r\n import { useClientSession, API } from '@/lib/useClientSession'\r\n import { useSearchParams } from 'next/navigation'\r\n \r\n let L: any = null\r\n \r\n-export default function HistoryPage() {\r\n+function HistoryContent() {\r\n   const { session, logout } = useClientSession()\r\n   const params = useSearchParams()\r\n \r\n   const mapRef    = useRef<HTMLDivElement>(null)\r\n@@ -279,5 +270,13 @@\n         select option{background:#0d1117;}\r\n       `}</style>\r\n     </div>\r\n   )\r\n+}\r\n+\r\n+export default function HistoryPage() {\r\n+  return (\r\n+    <Suspense fallback={<div style={{background:'#050608',height:'100dvh',display:'flex',alignItems:'center',justifyContent:'center',color:'#00b4d8'}}>Cargando...</div>}>\r\n+      <HistoryContent />\r\n+    </Suspense>\r\n+  )\r\n }\n\\ No newline at end of file\n"
                 }
             ],
             "date": 1780173122597,

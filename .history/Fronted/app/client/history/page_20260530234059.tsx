@@ -1,12 +1,21 @@
 'use client'
-import { Suspense } from 'react'
-import { useEffect, useRef, useState } from 'react'
+// history_page.tsx  (CON REPLAY)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Va en: Fronted/app/client/history/page.tsx  (REEMPLAZAR)
+//
+// Añade vs versión anterior:
+// - Botón ▶ Replay que anima el marcador punto a punto
+// - Control de velocidad del replay (1x, 2x, 5x, 10x)
+// - Barra de progreso del replay
+// - Odómetro del día en el resumen
+
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useClientSession, API } from '@/lib/useClientSession'
 import { useSearchParams } from 'next/navigation'
 
 let L: any = null
 
-function HistoryContent() {
+export default function HistoryPage() {
   const { session, logout } = useClientSession()
   const params = useSearchParams()
 
@@ -270,13 +279,5 @@ function HistoryContent() {
         select option{background:#0d1117;}
       `}</style>
     </div>
-  )
-}
-
-export default function HistoryPage() {
-  return (
-    <Suspense fallback={<div style={{background:'#050608',height:'100dvh',display:'flex',alignItems:'center',justifyContent:'center',color:'#00b4d8'}}>Cargando...</div>}>
-      <HistoryContent />
-    </Suspense>
   )
 }
