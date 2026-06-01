@@ -23,7 +23,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Header, Query
+from fastapi import Depends, FastAPI, HTTPException, Header, Query
 from pydantic import BaseModel
 
 
@@ -543,11 +543,11 @@ def _check_gateway_token(x_gateway_token: Optional[str]) -> None:
 
 def register_gateway_routes(app: FastAPI, require_admin) -> None:
 
-    @app.get("/admin/gateway/commands", dependencies=[require_admin])
+    @app.get("/admin/gateway/commands", dependencies=[Depends(require_admin)])
     def admin_gateway_commands():
         return get_available_commands()
 
-    @app.post("/admin/gateway/send", dependencies=[require_admin])
+    @app.post("/admin/gateway/send", dependencies=[Depends(require_admin)])
     def admin_gateway_send(payload: GatewaySendRequest):
         """
         Panel web admin manda comando lógico:
@@ -644,7 +644,7 @@ def register_gateway_routes(app: FastAPI, require_admin) -> None:
         _check_gateway_token(x_gateway_token)
         return _store_inbound_sms(payload.from_number, payload.body, payload.received_at)
 
-    @app.get("/admin/gps-messages", dependencies=[require_admin])
+    @app.get("/admin/gps-messages", dependencies=[Depends(require_admin)])
     def admin_gps_messages(limit: int = Query(default=20, ge=1, le=200)):
         with _get_conn() as conn:
             cur = conn.cursor()
