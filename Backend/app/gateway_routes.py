@@ -30,13 +30,15 @@ class GatewaySendPayload(BaseModel):
 
 GPS_COMMANDS = {
     "tracker":        {"sms": "tracker{p}",         "label": "Activar tracker",       "icon": "📡", "color": "#00d4a0", "sequence": None},
-    "locate":         {"sms": "check{p}",            "label": "Pedir ubicación",       "icon": "📍", "color": "#00d4a0", "sequence": ["tracker", "locate"]},
+    "locate":         {"sms": "fix060s999n{p}",    "label": "Localizar (60s SMS)",   "icon": "📍", "color": "#00d4a0", "sequence": None},
     "stop_engine":    {"sms": "stopelec{p}",         "label": "Apagar motor",          "icon": "🔴", "color": "#e8232a", "sequence": None},
     "start_engine":   {"sms": "supplyelec{p}",       "label": "Encender motor",        "icon": "🟢", "color": "#00d4a0", "sequence": None},
     "move_alert":     {"sms": "move{p}",             "label": "Alerta movimiento",     "icon": "🚨", "color": "#fbbf24", "sequence": None},
     "speed_alert":    {"sms": "speed{p} 080",        "label": "Alerta velocidad 80",   "icon": "⚡", "color": "#fb923c", "sequence": None},
     "no_speed":       {"sms": "nospeed{p}",          "label": "Desactivar vel.",       "icon": "✋", "color": "#6b7280", "sequence": None},
     "monitor":        {"sms": "monitor{p}",          "label": "Activar micrófono",     "icon": "🎤", "color": "#a78bfa", "sequence": None, "call_after": True},
+    "fix60":          {"sms": "fix060s999n{p}",      "label": "Track cada 60s SMS",    "icon": "📍", "color": "#00b4d8", "sequence": None},
+    "fix30":          {"sms": "fix030s999n{p}",      "label": "Track cada 30s SMS",    "icon": "📍", "color": "#0099CC", "sequence": None},
     "live_track":     {"sms": "fix030s999n{p}",      "label": "Tracking en vivo",      "icon": "🗺️", "color": "#60a5fa", "sequence": None},
     "stop_track":     {"sms": "nofix{p}",            "label": "Parar tracking",        "icon": "⏹️", "color": "#6b7280", "sequence": None},
     "status":         {"sms": "status{p}",           "label": "Estado GPS",            "icon": "ℹ️", "color": "#60a5fa", "sequence": None},
