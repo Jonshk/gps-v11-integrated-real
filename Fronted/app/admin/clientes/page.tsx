@@ -43,7 +43,7 @@ export default function ClientesPage() {
 
   function openCreate() { setForm(EMPTY); setError(""); setModal("create"); }
   function openEdit(c: AppClient) { setForm({...c}); setError(""); setModal("edit"); }
-  function close() { if (saving) return; setModal(null); setError(""); }
+  function close() { if (saving) return; setModal(null); setError(""); setGeneratedPwd(""); }
 
   async function save() {
     if (!form.client_name?.trim()) { setError("El nombre del cliente es obligatorio."); return; }
@@ -73,6 +73,7 @@ export default function ClientesPage() {
     } finally { setDeleting(false); }
   }
 
+  const set = (k: string, v: string) => setForm(f=>({...f,[k]:v}));
   const [generatedPwd, setGeneratedPwd] = useState("");
 
   function generatePassword() {
@@ -158,7 +159,20 @@ export default function ClientesPage() {
             <div style={S.field}><label style={S.label}>Nombre del cliente *</label><input style={S.input} value={form.client_name||""} onChange={e=>set("client_name",e.target.value)} placeholder="Transportes Pérez S.A."/></div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
               <div><label style={S.label}>Usuario app *</label><input style={S.input} value={form.username||""} onChange={e=>set("username",e.target.value)}/></div>
-              <div><label style={S.label}>Contraseña app {modal==="edit"&&<span style={{ fontWeight:400, textTransform:"none" }}>(dejar vacío = no cambiar)</span>}</label><input style={S.input} type="password" value={form.password||""} onChange={e=>set("password",e.target.value)}/></div>
+              <div>
+                <label style={S.label}>Contraseña app {modal==="edit"&&<span style={{ fontWeight:400, textTransform:"none" }}>(dejar vacío = no cambiar)</span>}</label>
+                <div style={{ display:"flex", gap:8 }}>
+                  <input style={{ ...S.input, flex:1 }} type="text" value={form.password||""} onChange={e=>set("password",e.target.value)} placeholder={modal==="edit"?"Sin cambios":"Escribe o genera"}/>
+                  <button type="button" onClick={generatePassword} style={{ padding:"10px 14px", background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.25)", borderRadius:10, color:"#3b82f6", fontSize:12, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>🔑 Generar</button>
+                </div>
+                {generatedPwd && form.password === generatedPwd && (
+                  <div style={{ marginTop:8, padding:"10px 14px", background:"rgba(34,197,94,0.08)", border:"1px solid rgba(34,197,94,0.2)", borderRadius:8, fontSize:12 }}>
+                    <span style={{ color:"#16a34a", fontWeight:700 }}>✓ Contraseña generada: </span>
+                    <span style={{ fontFamily:"monospace", fontWeight:800, color:"#16a34a", fontSize:14 }}>{generatedPwd}</span>
+                    <span style={{ color:"#6b7280", marginLeft:8 }}>— Comunícasela al cliente</span>
+                  </div>
+                )}
+              </div>
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
               <div><label style={S.label}>Email</label><input style={S.input} type="email" value={form.email||""} onChange={e=>set("email",e.target.value)}/></div>
