@@ -15,6 +15,8 @@ export default function ClientesPage() {
   const [form, setForm]         = useState<Partial<AppClient>>(EMPTY);
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<AppClient | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const S = {
     page:     { padding:"28px 32px", color:t.text, fontFamily:"'Plus Jakarta Sans',system-ui,sans-serif", background:t.bg, minHeight:"100vh" } as React.CSSProperties,
@@ -27,20 +29,26 @@ export default function ClientesPage() {
     errBox:   { padding:"10px 14px", background:"rgba(232,35,42,0.05)", border:"1px solid rgba(232,35,42,0.15)", borderRadius:8, color:"#e8232a", fontSize:13, marginBottom:14 } as React.CSSProperties,
     glass:    { background:t.card, backdropFilter:"blur(20px)", border:`1px solid ${t.border}`, borderRadius:16, boxShadow:"0 2px 20px rgba(0,0,0,0.08)" },
     modal:    { background:t.sidebar, border:`1px solid ${t.border}`, borderRadius:20, padding:32, width:480, maxHeight:"90vh", overflowY:"auto" as const, boxShadow:"0 24px 60px rgba(0,0,0,0.3)" },
+    overlay:  { position:"fixed" as const, inset:0, background:"rgba(0,0,0,0.5)", backdropFilter:"blur(4px)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 },
   };
 
   async function load() {
     setLoading(true);
-    try { const [c,d,v] = await Promise.all([adminApi.getClients(), adminApi.getDevices(), adminApi.getVehicles()]); setClients(c); setDevices(d); setVehicles(v); }
-    finally { setLoading(false); }
+    try {
+      const [c,d,v] = await Promise.all([adminApi.getClients(), adminApi.getDevices(), adminApi.getVehicles()]);
+      setClients(c); setDevices(d); setVehicles(v);
+    } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
 
   function openCreate() { setForm(EMPTY); setError(""); setModal("create"); }
   function openEdit(c: AppClient) { setForm({...c}); setError(""); setModal("edit"); }
-  function close() { setModal(null); setError(""); }
+  function close() { if (saving) return; setModal(null); setError(""); }
 
   async function save() {
+    if (!form.client_name?.trim()) { setError("El nombre del cliente es obligatorio."); return; }
+    if (!form.username?.trim()) { setError("El usuario es obligatorio."); return; }
+    if (modal === "create" && !form.password?.trim()) { setError("La contraseña es obligatoria."); return; }
     setSaving(true); setError("");
     try {
       if (modal==="create") await adminApi.createClient(form);
@@ -48,6 +56,18 @@ export default function ClientesPage() {
       await load(); close();
     } catch (e: unknown) { setError(e instanceof Error ? e.message : "Error"); }
     finally { setSaving(false); }
+  }
+
+  async function doDelete() {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await adminApi.deleteClient(confirmDelete.id);
+      await load();
+      setConfirmDelete(null);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Error al eliminar");
+    } finally { setDeleting(false); }
   }
 
   const set = (k: string, v: string) => setForm(f=>({...f,[k]:v}));
@@ -108,27 +128,28 @@ export default function ClientesPage() {
                 <button style={{ ...S.btnGhost, color:c.active?"#e8232a":"#16a34a", borderColor:c.active?"rgba(232,35,42,0.2)":"rgba(34,197,94,0.2)" }}
                   onClick={()=>adminApi.toggleClient(c.id).then(load)}>{c.active?"Off":"On"}</button>
                 <button style={{ ...S.btnGhost, color:"#e8232a", borderColor:"rgba(232,35,42,0.15)", padding:"7px 10px" }}
-                  onClick={()=>{ if(confirm(`¿Eliminar "${c.client_name}"?`)) adminApi.deleteClient(c.id).then(load); }}>✕</button>
+                  onClick={()=>setConfirmDelete(c)}>✕</button>
               </div>
             </div>
           ))}
         </div>
       )}
 
+      {/* Modal crear/editar */}
       {modal && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", backdropFilter:"blur(4px)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={close}>
+        <div style={S.overlay}>
           <div style={S.modal} onClick={e=>e.stopPropagation()}>
             <h2 style={{ color:t.text, fontSize:18, fontWeight:800, marginBottom:6 }}>{modal==="create"?"Nuevo cliente":"Editar cliente"}</h2>
             <p style={{ color:t.textFaint, fontSize:12, marginBottom:24 }}>Los datos se guardan en el servidor automáticamente.</p>
             {error && <div style={S.errBox}>{error}</div>}
-            <div style={S.field}><label style={S.label}>Nombre del cliente</label><input style={S.input} value={form.client_name||""} onChange={e=>set("client_name",e.target.value)} placeholder="Transportes Pérez S.A."/></div>
+            <div style={S.field}><label style={S.label}>Nombre del cliente *</label><input style={S.input} value={form.client_name||""} onChange={e=>set("client_name",e.target.value)} placeholder="Transportes Pérez S.A."/></div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
-              <div><label style={S.label}>Usuario app</label><input style={S.input} value={form.username||""} onChange={e=>set("username",e.target.value)}/></div>
-              <div><label style={S.label}>Contraseña app</label><input style={S.input} value={form.password||""} onChange={e=>set("password",e.target.value)}/></div>
+              <div><label style={S.label}>Usuario app *</label><input style={S.input} value={form.username||""} onChange={e=>set("username",e.target.value)}/></div>
+              <div><label style={S.label}>Contraseña app {modal==="edit"&&<span style={{ fontWeight:400, textTransform:"none" }}>(dejar vacío = no cambiar)</span>}</label><input style={S.input} type="password" value={form.password||""} onChange={e=>set("password",e.target.value)}/></div>
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
-              <div><label style={S.label}>Email</label><input style={S.input} value={form.email||""} onChange={e=>set("email",e.target.value)}/></div>
-              <div><label style={S.label}>Teléfono</label><input style={S.input} value={form.phone||""} onChange={e=>set("phone",e.target.value)}/></div>
+              <div><label style={S.label}>Email</label><input style={S.input} type="email" value={form.email||""} onChange={e=>set("email",e.target.value)}/></div>
+              <div><label style={S.label}>Teléfono</label><input style={S.input} type="tel" value={form.phone||""} onChange={e=>set("phone",e.target.value)} placeholder="+593..."/></div>
             </div>
             <div style={S.field}><label style={S.label}>Vehículo asignado</label>
               <select style={S.select} value={form.vehicle_id||""} onChange={e=>set("vehicle_id",e.target.value)}>
@@ -143,12 +164,32 @@ export default function ClientesPage() {
               </select>
             </div>
             <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
-              <button style={S.btnGhost} onClick={close}>Cancelar</button>
+              <button style={S.btnGhost} onClick={close} disabled={saving}>Cancelar</button>
               <button style={{ ...S.btnRed, opacity:saving?0.6:1 }} onClick={save} disabled={saving}>{saving?"Guardando...":"Guardar"}</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Modal confirmar eliminar */}
+      {confirmDelete && (
+        <div style={S.overlay}>
+          <div style={{ background:t.sidebar, border:`1px solid ${t.border}`, borderRadius:16, padding:28, width:360, boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ fontSize:32, textAlign:"center", marginBottom:12 }}>🗑️</div>
+            <h3 style={{ color:t.text, fontSize:16, fontWeight:800, textAlign:"center", margin:"0 0 8px" }}>Eliminar cliente</h3>
+            <p style={{ color:t.textFaint, fontSize:13, textAlign:"center", margin:"0 0 24px" }}>
+              ¿Estás seguro de eliminar <strong style={{ color:t.text }}>{confirmDelete.client_name}</strong>? Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+              <button style={S.btnGhost} onClick={()=>setConfirmDelete(null)} disabled={deleting}>Cancelar</button>
+              <button style={{ ...S.btnRed, opacity:deleting?0.6:1 }} onClick={doDelete} disabled={deleting}>
+                {deleting?"Eliminando...":"Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`@keyframes shimmer{0%,100%{opacity:.4}50%{opacity:.8}}`}</style>
     </div>
   );
