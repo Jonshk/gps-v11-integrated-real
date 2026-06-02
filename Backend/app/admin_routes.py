@@ -2,12 +2,6 @@
 admin_routes.py
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Va en: Backend/app/admin_routes.py  (REEMPLAZAR COMPLETO)
-
-Cambios de seguridad vs versión anterior:
-- Admin tokens persistentes en BD (no en memoria)
-- Login con bcrypt (compatible con contraseñas legacy)
-- Rate limiting en /app/login y /admin/login
-- /app/login devuelve ws_token para WebSockets
 """
 from __future__ import annotations
 import secrets as _secrets
@@ -27,7 +21,6 @@ def _require_admin(x_admin_token: str | None = Header(default=None)) -> None:
     if not x_admin_token or not validate_admin_session(x_admin_token):
         raise HTTPException(status_code=401, detail="Admin token inválido o expirado.")
 
-# App tokens siguen en memoria (vida corta, se regeneran al login)
 _app_tokens: dict[str, str] = {}
 
 def _require_app_token(x_app_token: str | None = Header(default=None)) -> str:
@@ -177,7 +170,6 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
         if get_client_by_username(payload.username):
             raise HTTPException(status_code=409, detail="Ya existe un cliente con ese usuario.")
         data = payload.model_dump()
-        # Hashear contraseña al crear
         data["password"]        = hash_password(data["password"])
         data["password_hashed"] = data["password"]
         for fk in ("vehicle_id", "gps_device_id"):
@@ -188,7 +180,6 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
     def edit_client(client_id: str, payload: ClientUpdate):
         from app.admin_repository import update_client
         data = payload.model_dump(exclude_unset=True)
-        # Si actualizan la contraseña, hashearla
         if "password" in data and data["password"]:
             data["password"]        = hash_password(data["password"])
             data["password_hashed"] = data["password"]
@@ -235,22 +226,82 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
 
     # ── Logs ──────────────────────────────────────────────────
     @app.get("/admin/logs", dependencies=[Depends(_require_admin)])
-    def admin_logs(limit: int = Query(default=200, ge=1, le=500)):
+    def admin_get_logs(
+        limit: int = Query(default=200, ge=1, le=500),
+        offset: int = 0,
+        client_id: Optional[str] = None,
+        source: Optional[str] = None,
+    ):
+        from app.db import get_conn
+        rows = []
+        with get_conn() as conn:
+            cur = conn.cursor()
+
+            # SMS queue — comandos enviados
+            if not source or source == "system":
+                where = "WHERE 1=1"
+                params: list = []
+                if client_id:
+                    where += " AND q.client_id = %s"
+                    params.append(client_id)
+                cur.execute(f"""
+                    SELECT
+                        q.id,
+                        q.created_at   AS timestamp,
+                        'system'       AS source,
+                        'Sistema'      AS actor,
+                        NULL           AS client_name,
+                        NULL           AS vehicle_name,
+                        COALESCE(q.command, 'locate') AS action,
+                        COALESCE(q.command, 'locate') AS action_label,
+                        q.status,
+                        q.error        AS detail,
+                        q.to_number    AS sim_number
+                    FROM sms_queue q
+                    {where}
+                    ORDER BY q.created_at DESC
+                    LIMIT %s OFFSET %s
+                """, params + [limit, offset])
+                rows += [dict(r) for r in cur.fetchall()]
+
+            # GPS messages — respuestas recibidas
+            if not source or source == "gateway":
+                gps_where = "WHERE 1=1"
+                gps_params: list = []
+                if client_id:
+                    gps_where += " AND m.client_id = %s"
+                    gps_params.append(client_id)
+                cur.execute(f"""
+                    SELECT
+                        m.id,
+                        m.received_at  AS timestamp,
+                        'gateway'      AS source,
+                        'Gateway'      AS actor,
+                        NULL           AS client_name,
+                        NULL           AS vehicle_name,
+                        COALESCE(m.parsed_type, 'inbound') AS action,
+                        COALESCE(m.label, m.body) AS action_label,
+                        'success'      AS status,
+                        m.body         AS detail,
+                        m.from_number  AS sim_number
+                    FROM gps_messages m
+                    {gps_where}
+                    ORDER BY m.received_at DESC
+                    LIMIT %s OFFSET %s
+                """, gps_params + [limit, offset])
+                rows += [dict(r) for r in cur.fetchall()]
+
+        rows.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+        return rows[:limit]
+
+    @app.delete("/admin/logs", dependencies=[Depends(_require_admin)])
+    def admin_clear_logs():
         from app.db import get_conn
         with get_conn() as conn:
             cur = conn.cursor()
-            try:
-                cur.execute("""
-                    SELECT id,from_number,body,received_at,label,icon,lat,lng,speed,battery
-                    FROM gps_messages ORDER BY received_at DESC LIMIT %s
-                """, (limit,))
-                return [{"id":d["id"],"type":"incoming","source":"gps",
-                         "from_number":d["from_number"],"body":d["body"],
-                         "label":d["label"],"icon":d["icon"],"lat":d["lat"],
-                         "lng":d["lng"],"speed":d["speed"],"battery":d["battery"],
-                         "received_at":d["received_at"]} for d in cur.fetchall()]
-            except Exception:
-                return []
+            cur.execute("DELETE FROM sms_queue")
+            cur.execute("DELETE FROM gps_messages")
+        return {"ok": True, "cleared": True}
 
     # ── Live position ─────────────────────────────────────────
     @app.get("/admin/live/{client_id}", dependencies=[Depends(_require_admin)])
@@ -268,33 +319,20 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
     # ── App login ─────────────────────────────────────────────
     @app.post("/app/login")
     def app_login(payload: AppLoginRequest, request: Request):
-        # Rate limiting — máx 10 intentos por minuto por IP
         check_rate_limit(get_client_ip(request), "/app/login")
-
-        from app.admin_repository import get_client_for_login
         from app.db import get_conn
-
-        # Buscar cliente (devuelve la fila con password y password_hashed)
         row = _get_client_login_full(payload.username)
         if not row:
             raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
-
-        # Verificar contraseña (compatible con plain y bcrypt)
         stored = row.get("password_hashed") or row.get("password") or ""
         if not verify_password_any(payload.password, stored):
             raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
-
         if not row.get("active"):
             raise HTTPException(status_code=403, detail="Cuenta desactivada.")
-
         if not row.get("sim_number"):
             raise HTTPException(status_code=400, detail="Este cliente no tiene un GPS asignado aún.")
-
-        # Token de sesión
         token = _secrets.token_hex(32)
         _app_tokens[token] = row["id"]
-
-        # ws_token — generar si no tiene
         ws_token = row.get("ws_token")
         if not ws_token:
             ws_token = _secrets.token_urlsafe(32)
@@ -302,7 +340,6 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
                 cur = conn.cursor()
                 cur.execute("UPDATE app_clients SET ws_token=%s WHERE id=%s",
                             (ws_token, row["id"]))
-
         return {
             "ok":           True,
             "token":        token,
@@ -372,7 +409,6 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
 # ── Helper interno ────────────────────────────────────────────
 
 def _get_client_login_full(username: str) -> dict | None:
-    """Trae el cliente con todos los campos necesarios para login."""
     from app.db import get_conn
     with get_conn() as conn:
         cur = conn.cursor()
@@ -385,82 +421,3 @@ def _get_client_login_full(username: str) -> dict | None:
         """, (username,))
         row = cur.fetchone()
         return dict(row) if row else None
-    # -- Logs de actividad -------------------------------------------------
-
-    @app.get("/admin/logs", dependencies=[Depends(_require_admin)])
-    def admin_get_logs(
-        limit: int = 200,
-        offset: int = 0,
-        client_id: str | None = None,
-        source: str | None = None,
-    ):
-        from app.db import get_conn
-        from app.admin_repository import get_client
-        rows = []
-        with get_conn() as conn:
-            cur = conn.cursor()
-            # SMS queue � comandos enviados
-            where = "WHERE 1=1"
-            params = []
-            if client_id:
-                where += " AND q.client_id = %s"; params.append(client_id)
-            if source == "system" or (not source):
-                cur.execute(f"""
-                    SELECT
-                        q.id,
-                        q.created_at   AS timestamp,
-                        'system'       AS source,
-                        'Sistema'      AS actor,
-                        NULL           AS client_name,
-                        NULL           AS vehicle_name,
-                        COALESCE(q.command, 'locate') AS action,
-                        COALESCE(q.command, 'locate') AS action_label,
-                        q.status,
-                        q.error        AS detail,
-                        q.to_number    AS sim_number
-                    FROM sms_queue q
-                    {where}
-                    ORDER BY q.created_at DESC
-                    LIMIT %s OFFSET %s
-                """, params + [limit, offset])
-                rows += [dict(r) for r in cur.fetchall()]
-
-            # GPS messages � respuestas recibidas
-            if not source or source == "gateway":
-                gps_where = "WHERE 1=1"
-                gps_params = []
-                if client_id:
-                    gps_where += " AND m.client_id = %s"; gps_params.append(client_id)
-                cur.execute(f"""
-                    SELECT
-                        m.id,
-                        m.received_at  AS timestamp,
-                        'gateway'      AS source,
-                        'Gateway'      AS actor,
-                        NULL           AS client_name,
-                        NULL           AS vehicle_name,
-                        COALESCE(m.parsed_type, 'inbound') AS action,
-                        COALESCE(m.label, m.body) AS action_label,
-                        'success'      AS status,
-                        m.body         AS detail,
-                        m.from_number  AS sim_number
-                    FROM gps_messages m
-                    {gps_where}
-                    ORDER BY m.received_at DESC
-                    LIMIT %s OFFSET %s
-                """, gps_params + [limit, offset])
-                rows += [dict(r) for r in cur.fetchall()]
-
-        # Ordenar por timestamp desc
-        rows.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
-        return rows[:limit]
-
-    @app.delete("/admin/logs", dependencies=[Depends(_require_admin)])
-    def admin_clear_logs():
-        from app.db import get_conn
-        with get_conn() as conn:
-            cur = conn.cursor()
-            cur.execute("DELETE FROM sms_queue")
-            cur.execute("DELETE FROM gps_messages")
-        return {"ok": True, "cleared": True}
-
