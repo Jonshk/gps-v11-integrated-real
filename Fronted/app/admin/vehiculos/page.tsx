@@ -23,6 +23,8 @@ const STATUS: Record<string,{label:string;color:string;dot:string}> = {
 };
 const COLS = ["Nombre / Placa","Estado","Posición GPS","Geocerca",""];
 
+function isValidCoord(v: string) { return v !== "" && !isNaN(parseFloat(v)); }
+
 export default function VehiculosPage() {
   const { t } = useTheme();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -31,18 +33,21 @@ export default function VehiculosPage() {
   const [form, setForm]         = useState<Record<string,string>>(EMPTY);
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<Vehicle | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const S = {
-    page:     { padding:"28px 32px", color:t.text, fontFamily:"'Plus Jakarta Sans',system-ui,sans-serif", background:t.bg, minHeight:"100vh" } as React.CSSProperties,
-    label:    { display:"block", color:t.textMuted, fontSize:11, fontWeight:700, marginBottom:6, textTransform:"uppercase" as const, letterSpacing:"0.06em" },
-    input:    { width:"100%", padding:"10px 14px", background:t.input, border:`1px solid ${t.border}`, borderRadius:10, color:t.text, fontSize:13, boxSizing:"border-box" as const, outline:"none" },
-    select:   { width:"100%", padding:"10px 14px", background:t.card, border:`1px solid ${t.border}`, borderRadius:10, color:t.text, fontSize:13, boxSizing:"border-box" as const, outline:"none" },
-    btnRed:   { padding:"10px 22px", background:"#e8232a", color:"#fff", border:"none", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", boxShadow:"0 4px 12px rgba(232,35,42,0.25)" } as React.CSSProperties,
-    btnGhost: { padding:"7px 14px", background:"transparent", color:t.textMuted, border:`1px solid ${t.border}`, borderRadius:8, fontSize:12, cursor:"pointer" } as React.CSSProperties,
-    field:    { marginBottom:16 } as React.CSSProperties,
-    errBox:   { padding:"10px 14px", background:"rgba(232,35,42,0.05)", border:"1px solid rgba(232,35,42,0.15)", borderRadius:8, color:"#e8232a", fontSize:13, marginBottom:14 } as React.CSSProperties,
-    glass:    { background:t.card, backdropFilter:"blur(20px)", border:`1px solid ${t.border}`, borderRadius:16, boxShadow:"0 2px 20px rgba(0,0,0,0.08)" },
-    modal:    { background:t.sidebar, border:`1px solid ${t.border}`, borderRadius:20, padding:32, width:440, boxShadow:"0 24px 60px rgba(0,0,0,0.3)" },
+    page:    { padding:"28px 32px", color:t.text, fontFamily:"'Plus Jakarta Sans',system-ui,sans-serif", background:t.bg, minHeight:"100vh" } as React.CSSProperties,
+    label:   { display:"block", color:t.textMuted, fontSize:11, fontWeight:700, marginBottom:6, textTransform:"uppercase" as const, letterSpacing:"0.06em" },
+    input:   { width:"100%", padding:"10px 14px", background:t.input, border:`1px solid ${t.border}`, borderRadius:10, color:t.text, fontSize:13, boxSizing:"border-box" as const, outline:"none" },
+    select:  { width:"100%", padding:"10px 14px", background:t.card, border:`1px solid ${t.border}`, borderRadius:10, color:t.text, fontSize:13, boxSizing:"border-box" as const, outline:"none" },
+    btnRed:  { padding:"10px 22px", background:"#e8232a", color:"#fff", border:"none", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", boxShadow:"0 4px 12px rgba(232,35,42,0.25)" } as React.CSSProperties,
+    btnGhost:{ padding:"7px 14px", background:"transparent", color:t.textMuted, border:`1px solid ${t.border}`, borderRadius:8, fontSize:12, cursor:"pointer" } as React.CSSProperties,
+    field:   { marginBottom:16 } as React.CSSProperties,
+    errBox:  { padding:"10px 14px", background:"rgba(232,35,42,0.05)", border:"1px solid rgba(232,35,42,0.15)", borderRadius:8, color:"#e8232a", fontSize:13, marginBottom:14 } as React.CSSProperties,
+    glass:   { background:t.card, backdropFilter:"blur(20px)", border:`1px solid ${t.border}`, borderRadius:16, boxShadow:"0 2px 20px rgba(0,0,0,0.08)" },
+    modal:   { background:t.sidebar, border:`1px solid ${t.border}`, borderRadius:20, padding:32, width:440, boxShadow:"0 24px 60px rgba(0,0,0,0.3)" },
+    overlay: { position:"fixed" as const, inset:0, background:"rgba(0,0,0,0.5)", backdropFilter:"blur(4px)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 },
   };
 
   async function load() { setLoading(true); try { setVehicles(await req("GET","/vehicles")); } finally { setLoading(false); } }
@@ -50,17 +55,31 @@ export default function VehiculosPage() {
 
   function openCreate() { setForm(EMPTY); setError(""); setModal("create"); }
   function openEdit(v: Vehicle) { setForm({ id:v.id, name:v.name, status:v.status, lat:String(v.lat), lng:String(v.lng), geofence:v.geofence||"" }); setError(""); setModal("edit"); }
-  function close() { setModal(null); setError(""); }
+  function close() { if (saving) return; setModal(null); setError(""); }
 
   async function save() {
+    if (!form.name?.trim()) { setError("El nombre es obligatorio."); return; }
+    if (!isValidCoord(form.lat)) { setError("La latitud debe ser un número válido."); return; }
+    if (!isValidCoord(form.lng)) { setError("La longitud debe ser un número válido."); return; }
+    const lat = parseFloat(form.lat), lng = parseFloat(form.lng);
+    if (lat < -90 || lat > 90) { setError("La latitud debe estar entre -90 y 90."); return; }
+    if (lng < -180 || lng > 180) { setError("La longitud debe estar entre -180 y 180."); return; }
     setSaving(true); setError("");
     try {
-      const payload = { name:form.name, status:form.status, lat:parseFloat(form.lat), lng:parseFloat(form.lng), speed:0, geofence:form.geofence||null };
+      const payload = { name:form.name, status:form.status, lat, lng, speed:0, geofence:form.geofence||null };
       if (modal==="create") await req("POST","/vehicles",{...payload,id:"veh-"+form.name.toLowerCase().replace(/[^a-z0-9]/g,"-").slice(0,12)+"-"+Date.now().toString(36)});
       else await req("PATCH",`/vehicles/${form.id}`,payload);
       await load(); close();
     } catch (e: unknown) { setError(e instanceof Error ? e.message : "Error"); }
     finally { setSaving(false); }
+  }
+
+  async function doDelete() {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try { await req("DELETE",`/vehicles/${confirmDelete.id}`); await load(); setConfirmDelete(null); }
+    catch (e: unknown) { alert(e instanceof Error ? e.message : "Error al eliminar"); }
+    finally { setDeleting(false); }
   }
 
   const set = (k: string, v: string) => setForm(f=>({...f,[k]:v}));
@@ -104,7 +123,7 @@ export default function VehiculosPage() {
                 <div style={{ fontSize:13, color:v.geofence?t.text:t.textFaint }}>{v.geofence||"—"}</div>
                 <div style={{ display:"flex", gap:6 }}>
                   <button style={S.btnGhost} onClick={()=>openEdit(v)}>Editar</button>
-                  <button style={{ ...S.btnGhost, color:"#e8232a", borderColor:"rgba(232,35,42,0.15)", padding:"7px 10px" }} onClick={()=>{ if(confirm(`¿Eliminar "${v.name}"?`)) req("DELETE",`/vehicles/${v.id}`).then(load); }}>✕</button>
+                  <button style={{ ...S.btnGhost, color:"#e8232a", borderColor:"rgba(232,35,42,0.15)", padding:"7px 10px" }} onClick={()=>setConfirmDelete(v)}>✕</button>
                 </div>
               </div>
             );
@@ -113,25 +132,41 @@ export default function VehiculosPage() {
       )}
 
       {modal && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", backdropFilter:"blur(4px)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={close}>
+        <div style={S.overlay}>
           <div style={S.modal} onClick={e=>e.stopPropagation()}>
             <h2 style={{ color:t.text, fontSize:18, fontWeight:800, marginBottom:6 }}>{modal==="create"?"Nuevo vehículo":"Editar vehículo"}</h2>
             <p style={{ color:t.textFaint, fontSize:12, marginBottom:24 }}>Las coordenadas se actualizan solas cuando el GPS reporta posición.</p>
             {error && <div style={S.errBox}>{error}</div>}
-            <div style={S.field}><label style={S.label}>Nombre / Placa</label><input style={S.input} value={form.name} onChange={e=>set("name",e.target.value)} placeholder="Toyota Hilux — ABC-1234"/></div>
+            <div style={S.field}><label style={S.label}>Nombre / Placa *</label><input style={S.input} value={form.name} onChange={e=>set("name",e.target.value)} placeholder="Toyota Hilux — ABC-1234"/></div>
             <div style={S.field}><label style={S.label}>Estado inicial</label>
               <select style={S.select} value={form.status} onChange={e=>set("status",e.target.value)}>
                 <option value="idle">En espera</option><option value="active">Activo</option><option value="offline">Sin señal</option>
               </select>
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
-              <div><label style={S.label}>Latitud</label><input style={S.input} value={form.lat} onChange={e=>set("lat",e.target.value)}/></div>
-              <div><label style={S.label}>Longitud</label><input style={S.input} value={form.lng} onChange={e=>set("lng",e.target.value)}/></div>
+              <div><label style={S.label}>Latitud (-90 a 90)</label><input style={S.input} value={form.lat} onChange={e=>set("lat",e.target.value.replace(/[^\d.\-]/g,""))} placeholder="-2.1704"/></div>
+              <div><label style={S.label}>Longitud (-180 a 180)</label><input style={S.input} value={form.lng} onChange={e=>set("lng",e.target.value.replace(/[^\d.\-]/g,""))} placeholder="-79.8895"/></div>
             </div>
             <div style={S.field}><label style={S.label}>Geocerca (opcional)</label><input style={S.input} value={form.geofence} onChange={e=>set("geofence",e.target.value)}/></div>
             <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
-              <button style={S.btnGhost} onClick={close}>Cancelar</button>
+              <button style={S.btnGhost} onClick={close} disabled={saving}>Cancelar</button>
               <button style={{ ...S.btnRed, opacity:saving?0.6:1 }} onClick={save} disabled={saving}>{saving?"Guardando...":"Guardar"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div style={S.overlay}>
+          <div style={{ background:t.sidebar, border:`1px solid ${t.border}`, borderRadius:16, padding:28, width:360, boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ fontSize:32, textAlign:"center", marginBottom:12 }}>🗑️</div>
+            <h3 style={{ color:t.text, fontSize:16, fontWeight:800, textAlign:"center", margin:"0 0 8px" }}>Eliminar vehículo</h3>
+            <p style={{ color:t.textFaint, fontSize:13, textAlign:"center", margin:"0 0 24px" }}>
+              ¿Estás seguro de eliminar <strong style={{ color:t.text }}>{confirmDelete.name}</strong>? Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+              <button style={S.btnGhost} onClick={()=>setConfirmDelete(null)} disabled={deleting}>Cancelar</button>
+              <button style={{ ...S.btnRed, opacity:deleting?0.6:1 }} onClick={doDelete} disabled={deleting}>{deleting?"Eliminando...":"Eliminar"}</button>
             </div>
           </div>
         </div>

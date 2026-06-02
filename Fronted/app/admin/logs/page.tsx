@@ -21,7 +21,8 @@ const ACTION_ICONS: Record<string, string> = {
   locate:"📍", stop_engine:"🔴", start_engine:"🟢", move_alert:"⚠️",
   speed_alert:"⚡", live_track:"📡", stop_track:"⏹️", monitor:"🎙️",
   status:"ℹ️", battery:"🔋", reset:"🔄", login:"🔐", logout:"🚪",
-  create:"➕", update:"✏️", delete:"🗑️", toggle:"🔁",
+  create:"➕", update:"✏️", delete:"🗑️", toggle:"🔁", location:"📍",
+  inbound:"📨",
 };
 
 export default function LogsPage() {
@@ -34,9 +35,12 @@ export default function LogsPage() {
   const [filterClient, setFilterClient] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [search, setSearch] = useState("");
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const glass = { background:t.card, backdropFilter:"blur(20px)", border:`1px solid ${t.border}`, borderRadius:16, boxShadow:"0 2px 20px rgba(0,0,0,0.08)" };
   const selectStyle = { padding:"8px 12px", background:t.card, border:`1px solid ${t.border}`, borderRadius:8, fontSize:13, color:t.text, outline:"none" };
+  const overlay = { position:"fixed" as const, inset:0, background:"rgba(0,0,0,0.5)", backdropFilter:"blur(4px)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 };
 
   const load = useCallback(async () => {
     try {
@@ -53,6 +57,13 @@ export default function LogsPage() {
     return () => clearInterval(timer);
   }, [autoRefresh, load]);
 
+  async function doClear() {
+    setClearing(true);
+    try { await adminApi.clearLogs(); await load(); setConfirmClear(false); }
+    catch (e: unknown) { alert(e instanceof Error ? e.message : "Error al limpiar"); }
+    finally { setClearing(false); }
+  }
+
   const filtered = logs.filter(l => {
     if (filterStatus && l.status !== filterStatus) return false;
     if (search) {
@@ -67,7 +78,9 @@ export default function LogsPage() {
   });
 
   function formatTime(iso: string) {
+    if (!iso) return "—";
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
     return d.toLocaleDateString("es-EC",{day:"2-digit",month:"2-digit"}) + " " +
            d.toLocaleTimeString("es-EC",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
   }
@@ -79,8 +92,6 @@ export default function LogsPage() {
 
   return (
     <div style={{ padding:"28px 32px", background:t.bg, minHeight:"100vh", fontFamily:"'Plus Jakarta Sans',system-ui,sans-serif", color:t.text }}>
-
-      {/* Header */}
       <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24 }}>
         <div>
           <p style={{ fontSize:10, fontWeight:800, letterSpacing:"0.18em", color:"#e8232a", textTransform:"uppercase", margin:"0 0 6px" }}>GPS Control EC</p>
@@ -89,30 +100,18 @@ export default function LogsPage() {
         </div>
         <div style={{ display:"flex", gap:8, alignItems:"center" }}>
           <button onClick={()=>setAutoRefresh(v=>!v)} style={{ padding:"8px 14px", borderRadius:10, fontSize:12, fontWeight:600, cursor:"pointer",
-            background:autoRefresh?"rgba(34,197,94,0.1)":t.input,
-            border:`1px solid ${autoRefresh?"rgba(34,197,94,0.25)":t.border}`,
-            color:autoRefresh?"#16a34a":t.textMuted,
-            display:"flex", alignItems:"center", gap:6 }}>
+            background:autoRefresh?"rgba(34,197,94,0.1)":t.input, border:`1px solid ${autoRefresh?"rgba(34,197,94,0.25)":t.border}`,
+            color:autoRefresh?"#16a34a":t.textMuted, display:"flex", alignItems:"center", gap:6 }}>
             <span style={{ width:6, height:6, borderRadius:"50%", background:autoRefresh?"#22c55e":t.textFaint, animation:autoRefresh?"liveDot 2s infinite":"none", display:"inline-block" }}/>
             {autoRefresh?"En vivo":"Pausado"}
           </button>
-          <button onClick={load} style={{ padding:"8px 14px", borderRadius:10, fontSize:12, fontWeight:600, cursor:"pointer", background:t.card, border:`1px solid ${t.border}`, color:t.text }}>
-            ↻ Actualizar
-          </button>
-          <button onClick={()=>{ if(confirm("¿Limpiar todos los logs?")) adminApi.clearLogs().then(load); }} style={{ padding:"8px 14px", borderRadius:10, fontSize:12, fontWeight:600, cursor:"pointer", background:"rgba(232,35,42,0.08)", border:"1px solid rgba(232,35,42,0.2)", color:"#e8232a" }}>
-            🗑 Limpiar logs
-          </button>
+          <button onClick={load} style={{ padding:"8px 14px", borderRadius:10, fontSize:12, fontWeight:600, cursor:"pointer", background:t.card, border:`1px solid ${t.border}`, color:t.text }}>↻ Actualizar</button>
+          <button onClick={()=>setConfirmClear(true)} style={{ padding:"8px 14px", borderRadius:10, fontSize:12, fontWeight:600, cursor:"pointer", background:"rgba(232,35,42,0.08)", border:"1px solid rgba(232,35,42,0.2)", color:"#e8232a" }}>🗑 Limpiar logs</button>
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:20 }}>
-        {[
-          { label:"Total",      value:total,   color:"#6b7280" },
-          { label:"Exitosos",   value:success, color:"#16a34a" },
-          { label:"Errores",    value:errors,  color:"#e8232a" },
-          { label:"Pendientes", value:pending, color:"#d97706" },
-        ].map(s=>(
+        {[{label:"Total",value:total,color:"#6b7280"},{label:"Exitosos",value:success,color:"#16a34a"},{label:"Errores",value:errors,color:"#e8232a"},{label:"Pendientes",value:pending,color:"#d97706"}].map(s=>(
           <div key={s.label} style={{ ...glass, padding:"16px 20px" }}>
             <div style={{ fontSize:11, fontWeight:700, color:t.textFaint, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:6 }}>{s.label}</div>
             <div style={{ fontSize:28, fontWeight:800, color:s.color, letterSpacing:"-1px" }}>{s.value}</div>
@@ -120,16 +119,13 @@ export default function LogsPage() {
         ))}
       </div>
 
-      {/* Filtros */}
       <div style={{ ...glass, padding:"14px 16px", marginBottom:16, display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar por actor, acción, detalle..."
           style={{ flex:1, minWidth:200, padding:"8px 12px", background:t.input, border:`1px solid ${t.border}`, borderRadius:8, fontSize:13, color:t.text, outline:"none" }}/>
         <select value={filterSource} onChange={e=>setFilterSource(e.target.value)} style={selectStyle}>
           <option value="">Todas las fuentes</option>
-          <option value="admin">Admin</option>
-          <option value="app">App móvil</option>
-          <option value="gateway">Gateway</option>
-          <option value="system">Sistema</option>
+          <option value="admin">Admin</option><option value="app">App móvil</option>
+          <option value="gateway">Gateway</option><option value="system">Sistema</option>
         </select>
         <select value={filterClient} onChange={e=>setFilterClient(e.target.value)} style={selectStyle}>
           <option value="">Todos los clientes</option>
@@ -137,25 +133,19 @@ export default function LogsPage() {
         </select>
         <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={selectStyle}>
           <option value="">Todos los estados</option>
-          <option value="success">Exitoso</option>
-          <option value="error">Error</option>
-          <option value="pending">Pendiente</option>
-          <option value="timeout">Timeout</option>
+          <option value="success">Exitoso</option><option value="error">Error</option>
+          <option value="pending">Pendiente</option><option value="timeout">Timeout</option>
         </select>
       </div>
 
-      {/* Tabla */}
       <div style={{ ...glass, overflow:"hidden" }}>
         <div style={{ display:"grid", gridTemplateColumns:"160px 90px 90px 1fr 1fr 120px 90px", padding:"10px 16px", background:t.input, borderBottom:`1px solid ${t.border}` }}>
           {["Fecha/Hora","Fuente","Estado","Actor","Acción","Vehículo",""].map(c=>(
             <div key={c} style={{ fontSize:10, fontWeight:700, color:t.textFaint, letterSpacing:"0.1em", textTransform:"uppercase" }}>{c}</div>
           ))}
         </div>
-
         {loading ? (
-          <div style={{ padding:24 }}>
-            {[1,2,3,4,5].map(i=><div key={i} style={{ height:48, borderRadius:8, background:t.border, marginBottom:6, animation:"shimmer 1.5s infinite" }}/>)}
-          </div>
+          <div style={{ padding:24 }}>{[1,2,3,4,5].map(i=><div key={i} style={{ height:48, borderRadius:8, background:t.border, marginBottom:6, animation:"shimmer 1.5s infinite" }}/>)}</div>
         ) : filtered.length===0 ? (
           <div style={{ padding:"60px 0", textAlign:"center", color:t.textFaint, fontSize:14 }}>
             {logs.length===0?"Sin actividad registrada aún.":"Sin resultados para los filtros aplicados."}
@@ -180,13 +170,11 @@ export default function LogsPage() {
                     <div style={{ fontSize:13, fontWeight:600, color:t.text }}>{log.actor}</div>
                     {log.client_name && log.actor!==log.client_name && <div style={{ fontSize:11, color:t.textFaint, marginTop:1 }}>{log.client_name}</div>}
                   </div>
-                  <div>
-                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      <span style={{ fontSize:14 }}>{icon}</span>
-                      <div>
-                        <div style={{ fontSize:13, color:t.text, fontWeight:500 }}>{log.action_label}</div>
-                        {log.detail && <div style={{ fontSize:10, color:log.status==="error"?"#e8232a":t.textFaint, marginTop:1, maxWidth:240, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{log.detail}</div>}
-                      </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ fontSize:14 }}>{icon}</span>
+                    <div>
+                      <div style={{ fontSize:13, color:t.text, fontWeight:500 }}>{log.action_label}</div>
+                      {log.detail && <div style={{ fontSize:10, color:log.status==="error"?"#e8232a":t.textFaint, marginTop:1, maxWidth:240, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{log.detail}</div>}
                     </div>
                   </div>
                   <div style={{ fontSize:12, color:log.vehicle_name?t.text:t.textFaint, fontWeight:log.vehicle_name?600:400 }}>{log.vehicle_name||"—"}</div>
@@ -197,6 +185,21 @@ export default function LogsPage() {
           </div>
         )}
       </div>
+
+      {/* Modal confirmar limpiar */}
+      {confirmClear && (
+        <div style={overlay}>
+          <div style={{ background:t.sidebar, border:`1px solid ${t.border}`, borderRadius:16, padding:28, width:360, boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ fontSize:32, textAlign:"center", marginBottom:12 }}>🗑️</div>
+            <h3 style={{ color:t.text, fontSize:16, fontWeight:800, textAlign:"center", margin:"0 0 8px" }}>Limpiar todos los logs</h3>
+            <p style={{ color:t.textFaint, fontSize:13, textAlign:"center", margin:"0 0 24px" }}>Se eliminarán todos los registros de comandos y respuestas GPS. Esta acción no se puede deshacer.</p>
+            <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+              <button style={{ padding:"10px 22px", background:"transparent", color:t.textMuted, border:`1px solid ${t.border}`, borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer" }} onClick={()=>setConfirmClear(false)} disabled={clearing}>Cancelar</button>
+              <button style={{ padding:"10px 22px", background:"#e8232a", color:"#fff", border:"none", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", opacity:clearing?0.6:1 }} onClick={doClear} disabled={clearing}>{clearing?"Limpiando...":"Limpiar todo"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes shimmer{0%,100%{opacity:.4}50%{opacity:.8}}
