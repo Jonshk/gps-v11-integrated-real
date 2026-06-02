@@ -385,3 +385,82 @@ def _get_client_login_full(username: str) -> dict | None:
         """, (username,))
         row = cur.fetchone()
         return dict(row) if row else None
+    # -- Logs de actividad -------------------------------------------------
+
+    @app.get("/admin/logs", dependencies=[Depends(_require_admin)])
+    def admin_get_logs(
+        limit: int = 200,
+        offset: int = 0,
+        client_id: str | None = None,
+        source: str | None = None,
+    ):
+        from app.db import get_conn
+        from app.admin_repository import get_client
+        rows = []
+        with get_conn() as conn:
+            cur = conn.cursor()
+            # SMS queue — comandos enviados
+            where = "WHERE 1=1"
+            params = []
+            if client_id:
+                where += " AND q.client_id = %s"; params.append(client_id)
+            if source == "system" or (not source):
+                cur.execute(f"""
+                    SELECT
+                        q.id,
+                        q.created_at   AS timestamp,
+                        'system'       AS source,
+                        'Sistema'      AS actor,
+                        NULL           AS client_name,
+                        NULL           AS vehicle_name,
+                        COALESCE(q.command, 'locate') AS action,
+                        COALESCE(q.command, 'locate') AS action_label,
+                        q.status,
+                        q.error        AS detail,
+                        q.to_number    AS sim_number
+                    FROM sms_queue q
+                    {where}
+                    ORDER BY q.created_at DESC
+                    LIMIT %s OFFSET %s
+                """, params + [limit, offset])
+                rows += [dict(r) for r in cur.fetchall()]
+
+            # GPS messages — respuestas recibidas
+            if not source or source == "gateway":
+                gps_where = "WHERE 1=1"
+                gps_params = []
+                if client_id:
+                    gps_where += " AND m.client_id = %s"; gps_params.append(client_id)
+                cur.execute(f"""
+                    SELECT
+                        m.id,
+                        m.received_at  AS timestamp,
+                        'gateway'      AS source,
+                        'Gateway'      AS actor,
+                        NULL           AS client_name,
+                        NULL           AS vehicle_name,
+                        COALESCE(m.parsed_type, 'inbound') AS action,
+                        COALESCE(m.label, m.body) AS action_label,
+                        'success'      AS status,
+                        m.body         AS detail,
+                        m.from_number  AS sim_number
+                    FROM gps_messages m
+                    {gps_where}
+                    ORDER BY m.received_at DESC
+                    LIMIT %s OFFSET %s
+                """, gps_params + [limit, offset])
+                rows += [dict(r) for r in cur.fetchall()]
+
+        # Ordenar por timestamp desc
+        rows.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+        return rows[:limit]
+
+    @app.delete("/admin/logs", dependencies=[Depends(_require_admin)])
+    def admin_clear_logs():
+        from app.db import get_conn
+        with get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM sms_queue")
+            cur.execute("DELETE FROM gps_messages")
+        return {"ok": True, "cleared": True}
+
