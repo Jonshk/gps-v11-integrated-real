@@ -73,7 +73,17 @@ export default function ClientesPage() {
     } finally { setDeleting(false); }
   }
 
-  const set = (k: string, v: string) => setForm(f=>({...f,[k]:v}));
+  const [generatedPwd, setGeneratedPwd] = useState("");
+
+  function generatePassword() {
+    const words = ["Gps","Auto","Ruta","Mapa","Flota","Track","Movi","Safe"];
+    const word = words[Math.floor(Math.random() * words.length)];
+    const num = Math.floor(1000 + Math.random() * 9000);
+    const sym = ["!","@","#","$","%"][Math.floor(Math.random() * 5)];
+    const pwd = `${word}${num}${sym}`;
+    setGeneratedPwd(pwd);
+    setForm(f=>({...f, password: pwd}));
+  }
   const COLS = ["Cliente","Credenciales","Vehículo","GPS / SIM","Estado",""];
 
   return (
@@ -108,7 +118,7 @@ export default function ClientesPage() {
               </div>
               <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
                 <span style={{ fontFamily:"monospace", fontSize:13, color:t.text, background:t.border, padding:"2px 8px", borderRadius:5, width:"fit-content" }}>{c.username}</span>
-                <span style={{ fontFamily:"monospace", fontSize:12, color:t.textFaint, padding:"2px 8px" }}>{c.password}</span>
+                <span style={{ fontFamily:"monospace", fontSize:12, color:t.textFaint, padding:"2px 8px" }}>••••••••</span>
               </div>
               <div style={{ fontSize:13, color:c.vehicle_name?t.text:t.textFaint }}>{c.vehicle_name||"—"}</div>
               <div>
