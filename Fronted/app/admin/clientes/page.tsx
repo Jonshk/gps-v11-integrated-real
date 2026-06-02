@@ -48,7 +48,10 @@ export default function ClientesPage() {
   async function save() {
     if (!form.client_name?.trim()) { setError("El nombre del cliente es obligatorio."); return; }
     if (!form.username?.trim()) { setError("El usuario es obligatorio."); return; }
+    if (/\s/.test(form.username||"")) { setError("El usuario no puede tener espacios."); return; }
     if (modal === "create" && !form.password?.trim()) { setError("La contraseña es obligatoria."); return; }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { setError("El email no es válido."); return; }
+    if (form.phone && form.phone.replace(/[\d+\s\-]/g,"").length > 0) { setError("El teléfono solo puede contener números, +, espacios y guiones."); return; }
     setSaving(true); setError("");
     try {
       if (modal==="create") await adminApi.createClient(form);
@@ -149,7 +152,7 @@ export default function ClientesPage() {
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
               <div><label style={S.label}>Email</label><input style={S.input} type="email" value={form.email||""} onChange={e=>set("email",e.target.value)}/></div>
-              <div><label style={S.label}>Teléfono</label><input style={S.input} type="tel" value={form.phone||""} onChange={e=>set("phone",e.target.value)} placeholder="+593..."/></div>
+              <div><label style={S.label}>Teléfono</label><input style={S.input} value={form.phone||""} onChange={e=>set("phone",e.target.value.replace(/[^\d+\s\-]/g,""))} placeholder="+593..."/></div>
             </div>
             <div style={S.field}><label style={S.label}>Vehículo asignado</label>
               <select style={S.select} value={form.vehicle_id||""} onChange={e=>set("vehicle_id",e.target.value)}>
