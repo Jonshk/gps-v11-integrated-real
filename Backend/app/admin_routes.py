@@ -237,7 +237,6 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
         with get_conn() as conn:
             cur = conn.cursor()
 
-            # SMS queue — comandos enviados
             if not source or source == "system":
                 where = "WHERE 1=1"
                 params: list = []
@@ -264,7 +263,6 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
                 """, params + [limit, offset])
                 rows += [dict(r) for r in cur.fetchall()]
 
-            # GPS messages — respuestas recibidas
             if not source or source == "gateway":
                 gps_where = "WHERE 1=1"
                 gps_params: list = []
@@ -347,6 +345,7 @@ def register_admin_routes(app: FastAPI, admin_password_getter) -> None:
             "client_name":  row["client_name"],
             "vehicle_name": row.get("vehicle_name") or "",
             "vehicle_id":   row.get("vehicle_id") or "",
+            "device_id":    row.get("vehicle_id") or "",  # ← FIX: alias para Flutter
             "sim_number":   row["sim_number"],
             "account_type": row.get("account_type") or "individual",
             "ws_token":     ws_token,
