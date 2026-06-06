@@ -2,11 +2,6 @@
 config.py
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Va en: Backend/app/config.py  (REEMPLAZAR)
-
-Cambios:
-- GPS_UPDATE_SECRET sin valor por defecto débil
-- CORS_ORIGINS desde .env
-- Advertencia si variables críticas no están configuradas
 """
 from __future__ import annotations
 import os, warnings
@@ -22,16 +17,22 @@ GPS_PASSWORD   = os.getenv("GPS_PASSWORD", "123456")
 # GPS_UPDATE_SECRET — sin fallback débil
 GPS_UPDATE_SECRET = os.getenv("GPS_UPDATE_SECRET", "")
 
-# CORS desde .env
-CORS_ORIGINS = [
-    item.strip()
-    for item in os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000,"
-        "https://gpscontrolec.com,https://www.gpscontrolec.com"
-    ).split(",")
-    if item.strip()
-]
+# CORS — en development acepta todo, en production solo dominios configurados
+_IS_DEV = os.getenv("ENVIRONMENT", "production") == "development"
+
+CORS_ORIGINS = (
+    ["*"]
+    if _IS_DEV
+    else [
+        item.strip()
+        for item in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:3000,http://127.0.0.1:3000,"
+            "https://gpscontrolec.com,https://www.gpscontrolec.com"
+        ).split(",")
+        if item.strip()
+    ]
+)
 
 # ── Advertencias en arranque ──────────────────────────────────
 _WEAK_DEFAULTS = {
