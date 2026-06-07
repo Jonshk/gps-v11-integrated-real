@@ -2,10 +2,7 @@
 gateway_routes.py
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Va en: Backend/app/gateway_routes.py  (REEMPLAZAR COMPLETO)
-
-Integración con Telnyx — sin Gateway Android.
-- Envío SMS via Telnyx API
-- Recepción de respuestas GPS via webhook Telnyx
+Usa Twilio para envío de SMS al GPS.
 """
 from __future__ import annotations
 
@@ -19,7 +16,7 @@ from pydantic import BaseModel
 
 
 # ─────────────────────────────────────────────────────────────
-# COMANDOS GPS CENTRALIZADOS
+# COMANDOS GPS
 # ─────────────────────────────────────────────────────────────
 
 GPS_COMMANDS: dict[str, dict] = {
@@ -108,16 +105,37 @@ def init_gateway_table() -> None:
         """)
 
 
-def queue_sms(to_number: str, body: str, client_id: Optional[str] = None, command: Optional[str] = None) -> str:
-    """Envía SMS inmediatamente via Telnyx y guarda en cola."""
-    from app.telnyx_service import send_sms
+def _send_via_twilio(to_number: str, body: str) -> dict:
+    """Envía SMS via Twilio."""
+    import os
+    from twilio.rest import Client
 
-    cmd_id    = str(uuid.uuid4())
-    info      = GPS_COMMANDS.get(command or "", {})
+    sid   = os.getenv("TWILIO_SID", "")
+    token = os.getenv("TWILIO_TOKEN", "")
+    from_ = os.getenv("TWILIO_FROM", "+19067027829")
+
+    if not sid or not token:
+        return {"ok": False, "error": "Twilio no configurado. Añade TWILIO_SID y TWILIO_TOKEN en Render."}
+
+    try:
+        client = Client(sid, token)
+        message = client.messages.create(
+            body=body,
+            from_=from_,
+            to=to_number,
+        )
+        return {"ok": True, "id": message.sid}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def queue_sms(to_number: str, body: str, client_id: Optional[str] = None, command: Optional[str] = None) -> str:
+    """Envía SMS via Twilio y guarda en cola."""
+    cmd_id     = str(uuid.uuid4())
+    info       = GPS_COMMANDS.get(command or "", {})
     needs_call = bool(info.get("needs_call", False))
 
-    # Enviar via Telnyx directamente
-    result = send_sms(to_number, body)
+    result = _send_via_twilio(to_number, body)
     status = "sent" if result["ok"] else "failed"
     error  = None if result["ok"] else result.get("error")
 
@@ -197,8 +215,8 @@ def parse_gps_sms(body: str) -> dict:
     if "pwdfail" in b: result.update({"label":"Contraseña incorrecta","icon":"⚠️","parsed_type":"password_error"}); return result
     if "fix ok" in b:  result.update({"label":"Ubicación solicitada","icon":"📍","parsed_type":"live_track_ok"}); return result
     if "nofix ok" in b: result.update({"label":"Tracking detenido","icon":"⏹️","parsed_type":"stop_track"}); return result
-    if "stopelec ok" in b or "stop engine" in b: result.update({"label":"Motor apagado","icon":"🔴","parsed_type":"engine_stopped"}); return result
-    if "supplyelec ok" in b or "supply engine" in b: result.update({"label":"Motor encendido","icon":"🟢","parsed_type":"engine_started"}); return result
+    if "stopelec ok" in b: result.update({"label":"Motor apagado","icon":"🔴","parsed_type":"engine_stopped"}); return result
+    if "supplyelec ok" in b: result.update({"label":"Motor encendido","icon":"🟢","parsed_type":"engine_started"}); return result
     if "move ok" in b: result.update({"label":"Alerta movimiento","icon":"🚨","parsed_type":"move_alert"}); return result
     if "speed ok" in b: result.update({"label":"Alerta velocidad","icon":"⚠️","parsed_type":"speed_alert"}); return result
     if "monitor ok" in b: result.update({"label":"Micrófono activo","icon":"🎤","parsed_type":"monitor_ok"}); return result
@@ -295,37 +313,43 @@ def register_gateway_routes(app: FastAPI, require_admin) -> None:
 
         return {"ok":True, "command_id":cmd_id, "client_id":payload.client_id,
                 "to":sim, "command":payload.command, "sms":sms_body,
-                "label":cmd_info["label"], "message":"Comando enviado via Telnyx."}
+                "label":cmd_info["label"], "message":"Comando enviado via Twilio."}
 
-    # ── Webhook Telnyx — recibe respuestas del GPS ────────────
+    # ── Webhook Twilio — recibe respuestas del GPS ────────────
+    @app.post("/gateway/inbound/twilio")
+    async def twilio_inbound(request: Request):
+        """Twilio llama este endpoint cuando el GPS responde por SMS."""
+        try:
+            form = await request.form()
+            from_number = form.get("From", "")
+            body        = form.get("Body", "")
+            if not body:
+                return {"ok": False, "error": "Sin body"}
+            result = _store_inbound_sms(from_number, body)
+            return result
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    # ── Webhook Telnyx — mantener por compatibilidad ──────────
     @app.post("/gateway/inbound/telnyx")
     async def telnyx_inbound(request: Request):
-        """Telnyx llama este endpoint cuando el GPS responde por SMS."""
         try:
             data = await request.json()
         except Exception:
             return {"ok": False}
-
-        # Estructura del webhook Telnyx v2
         event_type = data.get("data", {}).get("event_type", "")
         if event_type != "message.received":
             return {"ok": True, "skipped": True}
-
-        payload    = data.get("data", {}).get("payload", {})
+        payload     = data.get("data", {}).get("payload", {})
         from_number = payload.get("from", {}).get("phone_number", "")
         body        = payload.get("text", "")
         received_at = payload.get("received_at", "")
-
         if not body:
             return {"ok": False, "error": "Sin body"}
+        return _store_inbound_sms(from_number, body, received_at or None)
 
-        result = _store_inbound_sms(from_number, body, received_at or None)
-        return result
-
-    # ── Alias para compatibilidad con Gateway Android (por si acaso) ─
     @app.post("/gateway/inbound")
     async def gateway_inbound_legacy(request: Request):
-        """Alias legacy por compatibilidad."""
         try:
             data = await request.json()
         except Exception:
