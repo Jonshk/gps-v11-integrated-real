@@ -106,24 +106,32 @@ def init_gateway_table() -> None:
 
 
 def _send_via_twilio(to_number: str, body: str) -> dict:
-    """Envía SMS via Twilio."""
-    import os
+    """Envía SMS via Twilio usando Messaging Service SID si está disponible."""
     from twilio.rest import Client
 
-    sid   = os.getenv("TWILIO_SID", "")
-    token = os.getenv("TWILIO_TOKEN", "")
-    from_ = os.getenv("TWILIO_FROM", "+19067027829")
+    sid          = os.getenv("TWILIO_SID", "")
+    token        = os.getenv("TWILIO_TOKEN", "")
+    from_        = os.getenv("TWILIO_FROM", "+19067027829")
+    msg_svc_sid  = os.getenv("TWILIO_MESSAGING_SERVICE_SID", "")
 
     if not sid or not token:
         return {"ok": False, "error": "Twilio no configurado. Añade TWILIO_SID y TWILIO_TOKEN en Render."}
 
     try:
         client = Client(sid, token)
-        message = client.messages.create(
-            body=body,
-            from_=from_,
-            to=to_number,
-        )
+        # Usar Messaging Service SID si está configurado (necesario para A2P 10DLC)
+        if msg_svc_sid:
+            message = client.messages.create(
+                body=body,
+                messaging_service_sid=msg_svc_sid,
+                to=to_number,
+            )
+        else:
+            message = client.messages.create(
+                body=body,
+                from_=from_,
+                to=to_number,
+            )
         return {"ok": True, "id": message.sid}
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -315,10 +323,8 @@ def register_gateway_routes(app: FastAPI, require_admin) -> None:
                 "to":sim, "command":payload.command, "sms":sms_body,
                 "label":cmd_info["label"], "message":"Comando enviado via Twilio."}
 
-    # ── Webhook Twilio — recibe respuestas del GPS ────────────
     @app.post("/gateway/inbound/twilio")
     async def twilio_inbound(request: Request):
-        """Twilio llama este endpoint cuando el GPS responde por SMS."""
         try:
             form = await request.form()
             from_number = form.get("From", "")
@@ -330,7 +336,6 @@ def register_gateway_routes(app: FastAPI, require_admin) -> None:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
-    # ── Webhook Telnyx — mantener por compatibilidad ──────────
     @app.post("/gateway/inbound/telnyx")
     async def telnyx_inbound(request: Request):
         try:
