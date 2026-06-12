@@ -1,0 +1,18 @@
+{
+    "sourceFile": "Backend/app/telnyx_service.py",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1780693280248,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1780693280248,
+            "name": "Commit-0",
+            "content": "\"\"\"\r\ntelnyx_service.py\r\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\r\nVa en: Backend/app/telnyx_service.py\r\n\r\nServicio para enviar SMS via Telnyx API v2.\r\nReemplaza el Gateway Android.\r\n\"\"\"\r\nfrom __future__ import annotations\r\nimport os\r\nimport httpx\r\nfrom typing import Optional\r\n\r\n\r\nTELNYX_API_KEY    = os.getenv(\"TELNYX_API_KEY\", \"\")\r\nTELNYX_FROM       = os.getenv(\"TELNYX_FROM_NUMBER\", \"+12172259657\")\r\nTELNYX_API_BASE   = \"https://api.telnyx.com/v2\"\r\n\r\n\r\ndef send_sms(to: str, body: str) -> dict:\r\n    \"\"\"\r\n    Envía un SMS via Telnyx.\r\n    Retorna {\"ok\": True, \"id\": \"...\"} o {\"ok\": False, \"error\": \"...\"}\r\n    \"\"\"\r\n    if not TELNYX_API_KEY:\r\n        return {\"ok\": False, \"error\": \"TELNYX_API_KEY no configurada.\"}\r\n\r\n    try:\r\n        res = httpx.post(\r\n            f\"{TELNYX_API_BASE}/messages\",\r\n            headers={\r\n                \"Authorization\": f\"Bearer {TELNYX_API_KEY}\",\r\n                \"Content-Type\": \"application/json\",\r\n            },\r\n            json={\r\n                \"from\": TELNYX_FROM,\r\n                \"to\":   to,\r\n                \"text\": body,\r\n            },\r\n            timeout=15,\r\n        )\r\n        data = res.json()\r\n        if res.status_code in (200, 201):\r\n            msg_id = data.get(\"data\", {}).get(\"id\", \"\")\r\n            return {\"ok\": True, \"id\": msg_id}\r\n        else:\r\n            error = data.get(\"errors\", [{}])[0].get(\"detail\", f\"HTTP {res.status_code}\")\r\n            return {\"ok\": False, \"error\": error}\r\n    except Exception as e:\r\n        return {\"ok\": False, \"error\": str(e)}"
+        }
+    ]
+}
