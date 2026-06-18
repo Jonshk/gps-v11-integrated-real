@@ -93,6 +93,7 @@ export default function PrivacyPage() {
                   <li>Solo tú y los usuarios que autorices pueden ver la ubicación de tus vehículos</li>
                   <li>Los datos de ubicación <strong>nunca se venden</strong> ni ceden a terceros sin tu consentimiento expreso</li>
                 </ul>
+                <p>El Servicio utiliza mensajes SMS entre nuestra plataforma y el dispositivo GPS (no el teléfono personal del usuario) para el envío de comandos y recepción de reportes de estado. No compartimos ni vendemos los números SIM de los dispositivos a terceros para fines de marketing.</p>
               </section>
               <section id="terceros">
                 <h2><span className="legal-num">4.</span> Compartir con terceros</h2>

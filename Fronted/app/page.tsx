@@ -59,7 +59,7 @@ const plans = [
     sub: "/mes por vehiculo",
     desc: "El plan mas solicitado.",
     featured: true,
-    items: ["Hasta 10 vehiculos", "Geocercas ilimitadas", "Alertas SMS y push", "Soporte prioritario 24/7", "Reportes automaticos"],
+    items: ["Hasta 10 vehiculos", "Geocercas ilimitadas", "Alertas push en tiempo real", "Soporte prioritario 24/7", "Reportes automaticos"],
     waMsg: "Hola, quiero adquirir el plan Pro de GPS Control EC. ¿Cómo procedo?",
     cta: "Adquirir por WhatsApp",
   },

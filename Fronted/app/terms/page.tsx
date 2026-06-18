@@ -66,6 +66,8 @@ export default function TermsPage() {
                   <li>Reportes de actividad de flota</li>
                 </ul>
                 <p>{COMPANY} no es responsable por el funcionamiento del hardware ni de la cobertura del operador de telefonía.</p>
+                <h3>Activación del servicio y mensajería SMS</h3>
+                <p>Para activar el Servicio, el cliente se contacta con nuestro equipo a través de WhatsApp, donde confirma el plan deseado y acepta estos Términos de Uso y la Política de Privacidad antes de que activemos su dispositivo GPS en la plataforma. Una vez activado, el dispositivo GPS instalado en el vehículo (identificado por su número SIM, no el teléfono personal del usuario) intercambia mensajes SMS con nuestra plataforma para recibir comandos (solicitud de ubicación, configuración de alertas de movimiento, geocercas) y enviar reportes de estado. El usuario puede solicitar la baja del Servicio en cualquier momento contactando a soporte vía WhatsApp, lo cual resulta en la desactivación de la cuenta y el cese de esta comunicación SMS.</p>
               </section>
               <section id="cuenta">
                 <h2><span className="legal-num">3.</span> Registro y cuenta de usuario</h2>
